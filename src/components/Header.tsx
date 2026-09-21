@@ -27,15 +27,9 @@ export const Header: React.FC<HeaderProps> = ({
             <UtensilsCrossed className="w-5 h-5 text-zinc-950 stroke-[2.5]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 leading-none">
+            <h1 className="text-xl font-bold tracking-tight text-white leading-none">
               Nourryr
-              <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                Gym & Budget
-              </span>
             </h1>
-            <p className="text-[11px] text-zinc-400 leading-tight mt-0.5">
-              Haute protéine • Sans four
-            </p>
           </div>
         </div>
 
