@@ -39,10 +39,6 @@ export const GeneratorForm: React.FC<GeneratorFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasApiKey) {
-      onOpenSettings();
-      return;
-    }
     onGenerate({
       numberOfDays,
       totalMeals,

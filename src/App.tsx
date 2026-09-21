@@ -28,9 +28,26 @@ export function App() {
   const [hasApiKey, setHasApiKey] = useState(false);
 
   // Check API key presence
-  const checkApiKey = useCallback(() => {
+  const checkApiKey = useCallback(async () => {
     const key = localStorage.getItem('nourryr_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
-    setHasApiKey(!!key);
+    if (key) {
+      setHasApiKey(true);
+      return;
+    }
+
+    try {
+      const res = await fetch('/.netlify/functions/check-config');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.hasApiKey) {
+          setHasApiKey(true);
+          return;
+        }
+      }
+    } catch {
+      // Local dev without netlify functions
+    }
+    setHasApiKey(false);
   }, []);
 
   // Load initial data
