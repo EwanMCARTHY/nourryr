@@ -1,0 +1,17 @@
+{
+  "short_name": "Nourryr",
+  "name": "Nourryr • Repas Protéinés & Courses",
+  "description": "Générateur de repas sportifs riches en protéines, budget et courses sans four",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "display": "standalone",
+  "orientation": "portrait"
+}
