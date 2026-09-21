@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Database, Check, ExternalLink, Copy, CheckCheck, ShieldCheck } from 'lucide-react';
+import { X, Key, Database, Check, ExternalLink, Copy, CheckCheck, ShieldCheck, Loader2 } from 'lucide-react';
 import { resetSupabaseClient } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -35,12 +36,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [showSql, setShowSql] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [testingSupabase, setTestingSupabase] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setApiKey(localStorage.getItem('nourryr_gemini_api_key') || '');
       setSupabaseUrl(localStorage.getItem('nourryr_supabase_url') || '');
       setSupabaseAnonKey(localStorage.getItem('nourryr_supabase_anon_key') || '');
+      setSupabaseStatus(null);
     }
   }, [isOpen]);
 
@@ -67,6 +71,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     navigator.clipboard.writeText(SUPABASE_SQL_SNIPPET);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2000);
+  };
+
+  const testConnection = async () => {
+    if (!supabaseUrl.trim() || !supabaseAnonKey.trim()) {
+      setSupabaseStatus({ ok: false, message: "Renseigne d'abord l'URL et la clé anonyme." });
+      return;
+    }
+    setTestingSupabase(true);
+    setSupabaseStatus(null);
+    try {
+      const client = createClient(supabaseUrl.trim(), supabaseAnonKey.trim());
+      const { error } = await client.from('nourryr_plan').select('id').limit(1);
+      if (error) {
+        setSupabaseStatus({ ok: false, message: `Erreur: ${error.message}` });
+      } else {
+        setSupabaseStatus({ ok: true, message: "Connexion réussie ! Vos 2 tables sont prêtes." });
+      }
+    } catch (e: any) {
+      setSupabaseStatus({ ok: false, message: `Échec de connexion : ${e.message || 'URL incorrecte'}` });
+    } finally {
+      setTestingSupabase(false);
+    }
   };
 
   return (
@@ -153,17 +179,67 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 type="text"
                 placeholder="Supabase Project URL (https://xyz.supabase.co)"
                 value={supabaseUrl}
-                onChange={e => setSupabaseUrl(e.target.value)}
+                onChange={e => {
+                  setSupabaseUrl(e.target.value);
+                  setSupabaseStatus(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
               />
               <input
                 type="password"
                 placeholder="Supabase Anon Key (public API key)"
                 value={supabaseAnonKey}
-                onChange={e => setSupabaseAnonKey(e.target.value)}
+                onChange={e => {
+                  setSupabaseAnonKey(e.target.value);
+                  setSupabaseStatus(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
               />
             </div>
+
+            {/* Test Connection Button */}
+            <div className="pt-1 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={testConnection}
+                disabled={testingSupabase || !supabaseUrl || !supabaseAnonKey}
+                className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-40"
+              >
+                {testingSupabase ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    <span>Test en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Tester la connexion Supabase</span>
+                  </>
+                )}
+              </button>
+
+              {supabaseStatus && (
+                <span
+                  className={`text-xs font-semibold ${
+                    supabaseStatus.ok ? 'text-emerald-400' : 'text-red-400'
+                  }`}
+                >
+                  {supabaseStatus.ok ? '✓ Connecté' : '⚠️ Erreur'}
+                </span>
+              )}
+            </div>
+
+            {supabaseStatus && (
+              <div
+                className={`p-2.5 rounded-xl text-xs border ${
+                  supabaseStatus.ok
+                    ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-300'
+                    : 'bg-red-950/20 border-red-900/40 text-red-300'
+                }`}
+              >
+                {supabaseStatus.message}
+              </div>
+            )}
 
             {/* Toggle SQL helper */}
             <div className="pt-1">
