@@ -42,8 +42,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   useEffect(() => {
     if (isOpen) {
       setApiKey(localStorage.getItem('nourryr_gemini_api_key') || '');
-      setSupabaseUrl(localStorage.getItem('nourryr_supabase_url') || '');
-      setSupabaseAnonKey(localStorage.getItem('nourryr_supabase_anon_key') || '');
+      setSupabaseUrl(localStorage.getItem('nourryr_supabase_url') || 'https://fllsiukeseqwcuqsdylp.supabase.co');
+      setSupabaseAnonKey(
+        localStorage.getItem('nourryr_supabase_anon_key') ||
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsbHNpdWtlc2Vxd2N1cXNkeWxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwMTgyNzYsImV4cCI6MjEwNTU5NDI3Nn0.s1pnOelzk-S2ewcB4o4wrvh6E2Eg0hw8h7kBmxOt2is'
+      );
       setSupabaseStatus(null);
     }
   }, [isOpen]);
