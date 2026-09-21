@@ -39,7 +39,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         <div className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-zinc-950/95 backdrop-blur-md z-10">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              Jour {recipe.dayIndex} • {recipe.mealType}
+              Repas {recipe.mealIndex || ''}
             </span>
           </div>
 
@@ -53,14 +53,11 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
         {/* Scrollable content */}
         <div className="p-5 overflow-y-auto space-y-6">
-          {/* Title and description */}
+          {/* Title (No description) */}
           <div>
             <h2 className="text-xl font-black text-white tracking-tight leading-tight">
               {recipe.title}
             </h2>
-            <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
-              {recipe.description}
-            </p>
           </div>
 
           {/* Macros & Info Grid */}
@@ -77,7 +74,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               <span className="text-[10px] text-zinc-400 block font-medium">Énergie</span>
               <span className="text-sm font-black text-amber-400 flex items-center justify-center gap-0.5 mt-0.5">
                 <Flame className="w-3.5 h-3.5" />
-                {recipe.calories || '~600'} kcal
+                {recipe.calories || '~700'} kcal
               </span>
             </div>
 
@@ -102,10 +99,10 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-zinc-300">
               <ChefHat className="w-4 h-4 text-emerald-400" />
-              <span>Matériel requis :</span>
+              <span>Matériel :</span>
             </div>
             <span className="font-semibold text-emerald-400">
-              {recipe.equipmentUsed?.join(' • ') || 'Poêle • Plaques'} (Zéro four)
+              {recipe.equipmentUsed?.join(' • ') || 'Poêle • Plaques'} (Sans four)
             </span>
           </div>
 
@@ -116,7 +113,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                 Ingrédients ({numberOfPeople} {numberOfPeople > 1 ? 'personnes' : 'personne'})
               </h3>
               <span className="text-[11px] text-zinc-500 font-medium">
-                Quantités pour vos repas
+                Doses pour cuisiner
               </span>
             </div>
 
@@ -141,7 +138,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                 Préparation pas à pas
               </h3>
-              <span className="text-[11px] text-zinc-500">Coche au fur et à mesure</span>
+              <span className="text-[11px] text-zinc-500">Coche tes étapes</span>
             </div>
 
             <div className="space-y-2.5">
@@ -205,7 +202,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             className="py-3 px-4 rounded-xl bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 active:scale-95 transition-all text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40"
           >
             <RefreshCw className={`w-4 h-4 ${isSwapping ? 'animate-spin text-emerald-400' : ''}`} />
-            <span>{isSwapping ? 'Remplacement...' : 'Remplacer'}</span>
+            <span>{isSwapping ? 'Changement...' : 'Changer'}</span>
           </button>
         </div>
       </div>

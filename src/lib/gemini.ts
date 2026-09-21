@@ -1,9 +1,8 @@
-import type { MealPlan, Recipe, SavedMeal, Supermarket } from '../types';
+import type { MealPlan, Recipe, SavedMeal, ShoppingItem, Supermarket } from '../types';
 
 export interface GeneratePlanParams {
   numberOfDays: number;
   totalMeals: number;
-  mealsPerDay?: number;
   numberOfPeople: number;
   supermarket: Supermarket;
   budget: number;
@@ -13,20 +12,27 @@ export interface GeneratePlanParams {
 
 export interface SwapRecipeParams {
   currentRecipe: Recipe;
+  allRecipes: Recipe[];
+  currentShoppingList: ShoppingItem[];
   numberOfPeople: number;
   supermarket: Supermarket;
-  otherRecipeTitles: string[];
+  budget: number;
   apiKey?: string;
+}
+
+export interface SwapRecipeResult {
+  newRecipe: Recipe;
+  updatedShoppingList: ShoppingItem[];
+  estimatedTotalCost: number;
 }
 
 const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
 
 Tes règles ABSOLUES :
-1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion.
-   - Utilise des portions généreuses de protéines nobles : blancs de poulet/dinde (200g-250g/portion), bœuf haché 5%, thon au naturel (boîte entière), œufs entiers + blancs d'œufs, skyr 0%, fromage blanc, lentilles/haricots rouges en complément.
-2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : pas de cuisson au four, pas de gratins, pas de tartes ou rôtis).
-3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché). Optimise l'achat d'ingrédients de base partagés entre plusieurs repas pour éviter le gaspillage et respecter le budget.
-4. VARIÉTÉ ET GOÛT : Des repas savoureux, assaisonnés avec des épices simples (curry, paprika, ail, herbes de Provence, sauce soja...), rapides et pratiques pour le quotidien.
+1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion (portions généreuses de volaille 200-250g, bœuf haché 5%, thon, œufs, skyr, etc.).
+2. ÉQUIPEMENT DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : aucun gratin, quiche, rôti ou plat au four).
+3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché). Optimise l'achat d'ingrédients de base partagés entre plusieurs repas pour éviter le gaspillage.
+4. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse de recette, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
 5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 export async function generateMealPlan(params: GeneratePlanParams): Promise<MealPlan> {
@@ -44,40 +50,37 @@ export async function generateMealPlan(params: GeneratePlanParams): Promise<Meal
         return await res.json();
       }
     } catch {
-      // Netlify function not responding, fall through to client API key error
+      // Fall through to direct API error
     }
-    throw new Error("Clé API Gemini manquante. Renseigne ta clé API gratuite dans les paramètres de l'application.");
+    throw new Error("Clé API Gemini manquante. Renseigne ta clé API dans les paramètres ⚙️.");
   }
 
-  const prompt = `Génère exactement ${params.totalMeals} repas protéinés répartis sur ${params.numberOfDays} jours avec les critères suivants :
-- Nombre de jours : ${params.numberOfDays} jours
-- Nombre TOTAL de repas à cuisiner : ${params.totalMeals} repas (répartis logiquement sur les jours 1 à ${params.numberOfDays}, Déjeuner ou Dîner)
-- Nombre de personnes : ${params.numberOfPeople} mangeurs
-- Objectif protéines : 45g à 65g de protéines par portion (athlète 84 kg)
-- Supermarché : ${params.supermarket}
-- Budget total max : ${params.budget} €
-${params.savedRecipes && params.savedRecipes.length > 0 ? `- Recettes favorites des utilisateurs (à réutiliser ou favoriser en priorité) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
+  const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
+Supermarché : ${params.supermarket}
+Budget total max : ${params.budget} €
+Objectif : 45g à 65g de protéines par portion.
+Pas de four (uniquement poêle, plaques, casserole, micro-ondes).
+Pas de texte de description pour les repas.
+${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
 
-Réponds avec ce schéma JSON exact (contenant exactement ${params.totalMeals} objets dans "recipes") :
+Réponds avec ce schéma JSON exact :
 {
-  "estimatedTotalCost": nombre (estimation réaliste en euros du caddie total chez ${params.supermarket}),
+  "estimatedTotalCost": nombre (estimation en euros chez ${params.supermarket}),
   "recipes": [
     {
       "id": "r1",
-      "dayIndex": 1,
-      "mealType": "Déjeuner",
-      "title": "Nom de la recette",
-      "description": "Brève description alléchante",
+      "mealIndex": 1,
+      "title": "Nom précis du plat",
       "prepTimeMinutes": 15,
       "cookTimeMinutes": 15,
       "proteinGrams": 52,
       "calories": 700,
       "ingredients": [
-        { "name": "Escalope de poulet", "amount": "450g (pour 2 pers)" }
+        { "name": "Escalope de dinde", "amount": "450g" }
       ],
       "instructions": [
-        "Couper le poulet en dés...",
-        "Faire dorer à la poêle avec un filet d'huile d'olive..."
+        "Étape 1...",
+        "Étape 2..."
       ],
       "equipmentUsed": ["Poêle", "Plaques"]
     }
@@ -85,7 +88,7 @@ Réponds avec ce schéma JSON exact (contenant exactement ${params.totalMeals} o
   "shoppingList": [
     {
       "id": "s1",
-      "name": "Blancs de poulet (format familial)",
+      "name": "Blancs de dinde (format familial)",
       "quantity": "1.2 kg",
       "category": "Boucherie & Poissonnerie",
       "estimatedPrice": 14.50
@@ -129,7 +132,6 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
     createdAt: new Date().toISOString(),
     numberOfDays: params.numberOfDays,
     totalMeals: params.totalMeals,
-    mealsPerDay: Math.ceil(params.totalMeals / params.numberOfDays),
     numberOfPeople: params.numberOfPeople,
     supermarket: params.supermarket,
     budget: params.budget,
@@ -137,6 +139,7 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
     recipes: (parsed.recipes || []).map((r: any, idx: number) => ({
       ...r,
       id: r.id || 'recipe-' + (idx + 1) + '-' + Date.now(),
+      mealIndex: idx + 1,
       equipmentUsed: r.equipmentUsed || ['Poêle', 'Plaques'],
     })),
     shoppingList: (parsed.shoppingList || []).map((s: any, idx: number) => ({
@@ -149,7 +152,7 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
   return mealPlan;
 }
 
-export async function swapRecipe(params: SwapRecipeParams): Promise<Recipe> {
+export async function swapRecipe(params: SwapRecipeParams): Promise<SwapRecipeResult> {
   const apiKey = params.apiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
 
   if (!apiKey) {
@@ -168,30 +171,48 @@ export async function swapRecipe(params: SwapRecipeParams): Promise<Recipe> {
     throw new Error("Clé API Gemini requise pour régénérer la recette.");
   }
 
-  const prompt = `Génère UNE SEULE nouvelle recette de remplacement pour un ${params.currentRecipe.mealType}, jour ${params.currentRecipe.dayIndex}.
-Critères :
+  const otherTitles = params.allRecipes
+    .filter(r => r.id !== params.currentRecipe.id)
+    .map(r => r.title);
+
+  const prompt = `L'utilisateur souhaite remplacer le repas "${params.currentRecipe.title}" (Repas n°${params.currentRecipe.mealIndex || 1}).
+Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
-- Riche en protéines : 45g à 65g de protéines par portion (profil musculation 84 kg).
+- Riche en protéines : 45g à 65g de protéines par portion (musculation 84 kg).
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
-- Recette différente de : ${params.currentRecipe.title} et des autres repas déjà prévus : ${params.otherRecipeTitles.join(', ')}.
+- Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
 
-Réponds avec ce schéma JSON exact pour UNE seule recette :
+ADAPTATION DE LA LISTE DE COURSES :
+- Ajuste la liste de courses globale pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
+- Essaie en priorité de réutiliser des ingrédients déjà achetés dans le reste du panier pour respecter le budget max de ${params.budget} €.
+
+Réponds avec ce schéma JSON exact :
 {
-  "title": "Nom du plat",
-  "description": "Courte description",
-  "prepTimeMinutes": 15,
-  "cookTimeMinutes": 15,
-  "proteinGrams": 52,
-  "calories": 700,
-  "ingredients": [
-    { "name": "Ingrédient", "amount": "Quantité" }
+  "newRecipe": {
+    "title": "Nom du plat",
+    "prepTimeMinutes": 15,
+    "cookTimeMinutes": 15,
+    "proteinGrams": 52,
+    "calories": 700,
+    "ingredients": [
+      { "name": "Ingrédient", "amount": "Quantité" }
+    ],
+    "instructions": [
+      "Étape 1...",
+      "Étape 2..."
+    ],
+    "equipmentUsed": ["Poêle", "Plaques"]
+  },
+  "updatedShoppingList": [
+    {
+      "name": "Nom ingrédient",
+      "quantity": "Quantité globale",
+      "category": "Boucherie & Poissonnerie",
+      "estimatedPrice": 12.00
+    }
   ],
-  "instructions": [
-    "Étape 1...",
-    "Étape 2..."
-  ],
-  "equipmentUsed": ["Poêle", "Plaques"]
+  "estimatedTotalCost": nombre
 }`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
@@ -218,11 +239,34 @@ Réponds avec ce schéma JSON exact pour UNE seule recette :
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
   const parsed = JSON.parse(rawText);
 
-  return {
-    ...parsed,
+  // Preserve checked state from current shopping list if items still match
+  const checkedMap = new Map<string, boolean>();
+  params.currentShoppingList.forEach(item => {
+    checkedMap.set(item.name.toLowerCase().trim(), item.checked);
+  });
+
+  const updatedShoppingList: ShoppingItem[] = (parsed.updatedShoppingList || []).map((s: any, idx: number) => {
+    const isChecked = checkedMap.get(s.name?.toLowerCase()?.trim()) || false;
+    return {
+      id: 'shop-' + (idx + 1) + '-' + Date.now(),
+      name: s.name,
+      quantity: s.quantity,
+      category: s.category || 'Épicerie & Féculents',
+      checked: isChecked,
+      estimatedPrice: s.estimatedPrice,
+    };
+  });
+
+  const newRecipe: Recipe = {
+    ...parsed.newRecipe,
     id: 'recipe-swap-' + Date.now(),
-    dayIndex: params.currentRecipe.dayIndex,
-    mealType: params.currentRecipe.mealType,
-    equipmentUsed: parsed.equipmentUsed || ['Poêle', 'Plaques'],
+    mealIndex: params.currentRecipe.mealIndex,
+    equipmentUsed: parsed.newRecipe.equipmentUsed || ['Poêle', 'Plaques'],
+  };
+
+  return {
+    newRecipe,
+    updatedShoppingList: updatedShoppingList.length > 0 ? updatedShoppingList : params.currentShoppingList,
+    estimatedTotalCost: parsed.estimatedTotalCost || params.budget,
   };
 }

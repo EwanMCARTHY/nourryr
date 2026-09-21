@@ -120,7 +120,6 @@ export function App() {
       const newSaved: SavedMeal = {
         id: recipe.id,
         title: recipe.title,
-        description: recipe.description,
         proteinGrams: recipe.proteinGrams,
         calories: recipe.calories,
         prepTimeMinutes: recipe.prepTimeMinutes,
@@ -134,7 +133,7 @@ export function App() {
     }
   };
 
-  // Swap a single recipe
+  // Swap a single recipe (and adapt shopping list)
   const handleSwapRecipe = async (recipe: Recipe) => {
     if (!activePlan) return;
     setSwappingRecipeId(recipe.id);
@@ -142,25 +141,26 @@ export function App() {
 
     try {
       const apiKey = localStorage.getItem('nourryr_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
-      const otherTitles = activePlan.recipes
-        .filter(r => r.id !== recipe.id)
-        .map(r => r.title);
 
-      const newRecipe = await swapRecipe({
+      const result = await swapRecipe({
         currentRecipe: recipe,
+        allRecipes: activePlan.recipes,
+        currentShoppingList: activePlan.shoppingList,
         numberOfPeople: activePlan.numberOfPeople,
         supermarket: activePlan.supermarket,
-        otherRecipeTitles: otherTitles,
+        budget: activePlan.budget,
         apiKey,
       });
 
       const updatedRecipes = activePlan.recipes.map(r =>
-        r.id === recipe.id ? newRecipe : r
+        r.id === recipe.id ? result.newRecipe : r
       );
 
       const updatedPlan: MealPlan = {
         ...activePlan,
         recipes: updatedRecipes,
+        shoppingList: result.updatedShoppingList,
+        estimatedTotalCost: result.estimatedTotalCost,
       };
 
       setActivePlan(updatedPlan);
@@ -208,9 +208,9 @@ export function App() {
     await saveCurrentPlan(updatedPlan);
   };
 
-  // Reset entire plan
+  // Reset / Delete entire plan
   const handleResetPlan = async () => {
-    if (window.confirm('Créer un nouveau programme ? Ton programme actuel sera réinitialisé.')) {
+    if (window.confirm('Supprimer ce programme ? Tu pourras en générer un nouveau immédiatement.')) {
       setActivePlan(null);
       await saveCurrentPlan(null);
     }
@@ -226,14 +226,11 @@ export function App() {
   const handleInspectSavedMeal = (saved: SavedMeal) => {
     const asRecipe: Recipe = {
       id: saved.id,
-      dayIndex: 1,
-      mealType: 'Déjeuner',
       title: saved.title,
-      description: saved.description || '',
       prepTimeMinutes: saved.prepTimeMinutes,
       cookTimeMinutes: saved.cookTimeMinutes,
       proteinGrams: saved.proteinGrams,
-      calories: saved.calories || 600,
+      calories: saved.calories || 700,
       ingredients: saved.ingredients,
       instructions: saved.instructions,
       equipmentUsed: ['Poêle', 'Plaques'],
@@ -289,6 +286,7 @@ export function App() {
             onSwapRecipe={handleSwapRecipe}
             onToggleShoppingItem={handleToggleShoppingItem}
             onResetShoppingChecks={handleResetShoppingChecks}
+            onDeletePlan={handleResetPlan}
             swappingRecipeId={swappingRecipeId}
           />
         )}

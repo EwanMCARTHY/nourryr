@@ -4,6 +4,7 @@ import { Clock, Dumbbell, Flame, Bookmark, BookmarkCheck, RefreshCw, ChefHat } f
 
 interface RecipeCardProps {
   recipe: Recipe;
+  index: number;
   onSelect: (recipe: Recipe) => void;
   onToggleSave: (recipe: Recipe) => Promise<void>;
   onSwap: (recipe: Recipe) => Promise<void>;
@@ -13,6 +14,7 @@ interface RecipeCardProps {
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({
   recipe,
+  index,
   onSelect,
   onToggleSave,
   onSwap,
@@ -33,6 +35,8 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     onSwap(recipe);
   };
 
+  const mealNumber = recipe.mealIndex || index + 1;
+
   return (
     <div
       onClick={() => onSelect(recipe)}
@@ -40,14 +44,9 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     >
       {/* Top badges */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700/60">
-            Jour {recipe.dayIndex}
-          </span>
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400">
-            {recipe.mealType}
-          </span>
-        </div>
+        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700/60">
+          Repas {mealNumber}
+        </span>
 
         {/* Protein Badge */}
         <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs">
@@ -56,13 +55,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         </div>
       </div>
 
-      {/* Recipe Title & Description */}
+      {/* Recipe Title (No description) */}
       <h3 className="text-base font-bold text-white tracking-tight leading-snug group-hover:text-emerald-300 transition-colors">
         {recipe.title}
       </h3>
-      <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
-        {recipe.description}
-      </p>
 
       {/* Meta indicators */}
       <div className="flex items-center gap-3 mt-3 text-[11px] text-zinc-400">
@@ -87,7 +83,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       {/* Bottom actions bar */}
       <div className="mt-3.5 pt-3 border-t border-zinc-800/60 flex items-center justify-between">
         <span className="text-xs font-medium text-emerald-400 group-hover:underline flex items-center gap-1">
-          Voir la recette →
+          Voir les étapes →
         </span>
 
         <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
@@ -97,7 +93,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             disabled={isSwapping}
             onClick={handleSwapClick}
             className="p-2 rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 active:scale-95 transition-all text-xs flex items-center gap-1 disabled:opacity-40"
-            title="Remplacer cette recette"
+            title="Changer ce repas (adapte aussi la liste de courses)"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSwapping ? 'animate-spin text-emerald-400' : ''}`} />
             <span className="text-[11px]">{isSwapping ? 'Changement...' : 'Changer'}</span>

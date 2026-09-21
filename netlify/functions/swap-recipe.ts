@@ -5,7 +5,8 @@ Tes règles ABSOLUES :
 1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS : Chaque repas principal doit fournir STRICTEMENT entre 45g et 65g de protéines par portion (poulet, dinde, boeuf haché 5%, thon, oeufs, skyr, etc.).
 2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit).
 3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
-4. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
+4. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse, pas de mention Déjeuner/Dîner.
+5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -23,30 +24,48 @@ export const handler: Handler = async (event) => {
   try {
     const params = JSON.parse(event.body || '{}');
 
-    const prompt = `Génère UNE SEULE nouvelle recette de remplacement pour un ${params.currentRecipe.mealType}, jour ${params.currentRecipe.dayIndex}.
-Critères :
+    const otherTitles = (params.allRecipes || [])
+      .filter((r: any) => r.id !== params.currentRecipe.id)
+      .map((r: any) => r.title);
+
+    const prompt = `L'utilisateur souhaite remplacer le repas "${params.currentRecipe.title}" (Repas n°${params.currentRecipe.mealIndex || 1}).
+Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
-- Riche en protéines : 45g à 65g de protéines par portion (profil musculation 84 kg).
+- Riche en protéines : 45g à 65g de protéines par portion (musculation 84 kg).
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
-- Recette différente de : ${params.currentRecipe.title} et des autres repas déjà prévus : ${(params.otherRecipeTitles || []).join(', ')}.
+- Recette différente de "${params.currentRecipe.title}" et des autres plats déjà prévus : ${otherTitles.join(', ')}.
 
-Réponds avec ce schéma JSON exact pour UNE seule recette :
+ADAPTATION DE LA LISTE DE COURSES :
+- Ajuste la liste de courses globale pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
+- Essaie en priorité de réutiliser des ingrédients déjà achetés dans le reste du panier pour respecter le budget max de ${params.budget} €.
+
+Réponds avec ce schéma JSON exact :
 {
-  "title": "Nom du plat",
-  "description": "Courte description",
-  "prepTimeMinutes": 15,
-  "cookTimeMinutes": 15,
-  "proteinGrams": 52,
-  "calories": 700,
-  "ingredients": [
-    { "name": "Ingrédient", "amount": "Quantité" }
+  "newRecipe": {
+    "title": "Nom du plat",
+    "prepTimeMinutes": 15,
+    "cookTimeMinutes": 15,
+    "proteinGrams": 52,
+    "calories": 700,
+    "ingredients": [
+      { "name": "Ingrédient", "amount": "Quantité" }
+    ],
+    "instructions": [
+      "Étape 1...",
+      "Étape 2..."
+    ],
+    "equipmentUsed": ["Poêle", "Plaques"]
+  },
+  "updatedShoppingList": [
+    {
+      "name": "Nom ingrédient",
+      "quantity": "Quantité globale",
+      "category": "Boucherie & Poissonnerie",
+      "estimatedPrice": 12.00
+    }
   ],
-  "instructions": [
-    "Étape 1...",
-    "Étape 2..."
-  ],
-  "equipmentUsed": ["Poêle", "Plaques"]
+  "estimatedTotalCost": nombre
 }`;
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
@@ -73,15 +92,34 @@ Réponds avec ce schéma JSON exact pour UNE seule recette :
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const parsed = JSON.parse(rawText);
 
+    const checkedMap = new Map<string, boolean>();
+    (params.currentShoppingList || []).forEach((item: any) => {
+      checkedMap.set(item.name?.toLowerCase()?.trim(), item.checked);
+    });
+
+    const updatedShoppingList = (parsed.updatedShoppingList || []).map((s: any, idx: number) => ({
+      id: 'shop-' + (idx + 1) + '-' + Date.now(),
+      name: s.name,
+      quantity: s.quantity,
+      category: s.category || 'Épicerie & Féculents',
+      checked: checkedMap.get(s.name?.toLowerCase()?.trim()) || false,
+      estimatedPrice: s.estimatedPrice,
+    }));
+
+    const newRecipe = {
+      ...parsed.newRecipe,
+      id: 'recipe-swap-' + Date.now(),
+      mealIndex: params.currentRecipe.mealIndex,
+      equipmentUsed: parsed.newRecipe.equipmentUsed || ['Poêle', 'Plaques'],
+    };
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...parsed,
-        id: 'recipe-swap-' + Date.now(),
-        dayIndex: params.currentRecipe.dayIndex,
-        mealType: params.currentRecipe.mealType,
-        equipmentUsed: parsed.equipmentUsed || ['Poêle', 'Plaques'],
+        newRecipe,
+        updatedShoppingList: updatedShoppingList.length > 0 ? updatedShoppingList : params.currentShoppingList,
+        estimatedTotalCost: parsed.estimatedTotalCost || params.budget,
       }),
     };
   } catch (err: any) {

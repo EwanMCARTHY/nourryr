@@ -1,7 +1,5 @@
 export type Supermarket = 'E.Leclerc' | 'Auchan' | 'Intermarché';
 
-export type MealType = 'Déjeuner' | 'Dîner' | 'Collation protéinée';
-
 export type GroceryCategory =
   | 'Boucherie & Poissonnerie'
   | 'Crémerie & Œufs'
@@ -16,10 +14,9 @@ export interface RecipeIngredient {
 
 export interface Recipe {
   id: string;
-  dayIndex: number;
-  mealType: MealType;
+  mealIndex?: number; // Repas 1, Repas 2...
+  dayIndex?: number;
   title: string;
-  description: string;
   prepTimeMinutes: number;
   cookTimeMinutes: number;
   proteinGrams: number;
@@ -44,7 +41,6 @@ export interface MealPlan {
   createdAt: string;
   numberOfDays: number;
   totalMeals: number;
-  mealsPerDay?: number;
   numberOfPeople: number;
   supermarket: Supermarket;
   budget: number;
@@ -56,7 +52,6 @@ export interface MealPlan {
 export interface SavedMeal {
   id: string;
   title: string;
-  description?: string;
   proteinGrams: number;
   calories?: number;
   prepTimeMinutes: number;

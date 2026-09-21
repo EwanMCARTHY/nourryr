@@ -3,11 +3,10 @@ import type { Handler } from '@netlify/functions';
 const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
 
 Tes règles ABSOLUES :
-1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion.
-   - Utilise des portions généreuses de protéines nobles : blancs de poulet/dinde (200g-250g/portion), bœuf haché 5%, thon au naturel (boîte entière), œufs entiers + blancs d'œufs, skyr 0%, fromage blanc, lentilles/haricots rouges en complément.
-2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : pas de cuisson au four, pas de gratins, pas de tartes ou rôtis).
-3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché). Optimise l'achat d'ingrédients de base partagés entre plusieurs repas pour éviter le gaspillage et respecter le budget.
-4. VARIÉTÉ ET GOÛT : Des repas savoureux, assaisonnés avec des épices simples (curry, paprika, ail, herbes de Provence, sauce soja...), rapides et pratiques pour le quotidien.
+1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion (portions généreuses de volaille 200-250g, bœuf haché 5%, thon, œufs, skyr, etc.).
+2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : aucun gratin, quiche, rôti ou plat au four).
+3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché). Optimise l'achat d'ingrédients de base partagés entre plusieurs repas pour éviter le gaspillage.
+4. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse de repas, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
 5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 export const handler: Handler = async (event) => {
@@ -26,35 +25,32 @@ export const handler: Handler = async (event) => {
   try {
     const params = JSON.parse(event.body || '{}');
 
-    const prompt = `Génère exactement ${params.totalMeals} repas protéinés répartis sur ${params.numberOfDays} jours avec les critères suivants :
-- Nombre de jours : ${params.numberOfDays} jours
-- Nombre TOTAL de repas à cuisiner : ${params.totalMeals} repas (répartis logiquement sur les jours 1 à ${params.numberOfDays}, Déjeuner ou Dîner)
-- Nombre de personnes : ${params.numberOfPeople} mangeurs
-- Objectif protéines : 45g à 65g de protéines par portion (athlète 84 kg)
-- Supermarché : ${params.supermarket}
-- Budget total max : ${params.budget} €
-${params.savedRecipes && params.savedRecipes.length > 0 ? `- Recettes favorites des utilisateurs (à réutiliser ou favoriser en priorité) : ${params.savedRecipes.map((r: any) => r.title).join(', ')}` : ''}
+    const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
+Supermarché : ${params.supermarket}
+Budget total max : ${params.budget} €
+Objectif : 45g à 65g de protéines par portion.
+Pas de four (uniquement poêle, plaques, casserole, micro-ondes).
+Pas de texte de description pour les repas.
+${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map((r: any) => r.title).join(', ')}` : ''}
 
-Réponds avec ce schéma JSON exact (contenant exactement ${params.totalMeals} objets dans "recipes") :
+Réponds avec ce schéma JSON exact :
 {
-  "estimatedTotalCost": nombre (estimation réaliste en euros du caddie total chez ${params.supermarket}),
+  "estimatedTotalCost": nombre (estimation réaliste en euros chez ${params.supermarket}),
   "recipes": [
     {
       "id": "r1",
-      "dayIndex": 1,
-      "mealType": "Déjeuner",
-      "title": "Nom de la recette",
-      "description": "Brève description alléchante",
+      "mealIndex": 1,
+      "title": "Nom précis du plat",
       "prepTimeMinutes": 15,
       "cookTimeMinutes": 15,
       "proteinGrams": 52,
       "calories": 700,
       "ingredients": [
-        { "name": "Escalope de poulet", "amount": "450g (pour 2 pers)" }
+        { "name": "Escalope de dinde", "amount": "450g" }
       ],
       "instructions": [
-        "Couper le poulet en dés...",
-        "Faire dorer à la poêle avec un filet d'huile d'olive..."
+        "Étape 1...",
+        "Étape 2..."
       ],
       "equipmentUsed": ["Poêle", "Plaques"]
     }
@@ -62,7 +58,7 @@ Réponds avec ce schéma JSON exact (contenant exactement ${params.totalMeals} o
   "shoppingList": [
     {
       "id": "s1",
-      "name": "Blancs de poulet (format familial)",
+      "name": "Blancs de dinde (format familial)",
       "quantity": "1.2 kg",
       "category": "Boucherie & Poissonnerie",
       "estimatedPrice": 14.50
@@ -102,7 +98,6 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
       createdAt: new Date().toISOString(),
       numberOfDays: params.numberOfDays,
       totalMeals: params.totalMeals,
-      mealsPerDay: Math.ceil(params.totalMeals / params.numberOfDays),
       numberOfPeople: params.numberOfPeople,
       supermarket: params.supermarket,
       budget: params.budget,
@@ -110,6 +105,7 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
       recipes: (parsed.recipes || []).map((r: any, idx: number) => ({
         ...r,
         id: r.id || 'recipe-' + (idx + 1) + '-' + Date.now(),
+        mealIndex: idx + 1,
         equipmentUsed: r.equipmentUsed || ['Poêle', 'Plaques'],
       })),
       shoppingList: (parsed.shoppingList || []).map((s: any, idx: number) => ({
