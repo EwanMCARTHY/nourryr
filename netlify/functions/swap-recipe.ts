@@ -1,9 +1,9 @@
 import type { Handler } from '@netlify/functions';
 
-const SYSTEM_INSTRUCTION = `Tu es un nutritionniste du sport et un chef cuisinier professionnel spécialisé dans l'alimentation pour la musculation, la prise de muscle sec et la performance sportive.
+const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
 Tes règles ABSOLUES :
-1. APPORTS PROTÉINÉS ÉLEVÉS : Chaque repas principal doit fournir entre 35g et 55g de protéines par portion (poulet, dinde, boeuf haché 5%, thon, oeufs, skyr, fromage blanc, lentilles, tofu, etc.).
-2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : pas de gratins au four, pas de quiches au four, pas de rôtis).
+1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS : Chaque repas principal doit fournir STRICTEMENT entre 45g et 65g de protéines par portion (poulet, dinde, boeuf haché 5%, thon, oeufs, skyr, etc.).
+2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit).
 3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
 4. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
@@ -27,7 +27,7 @@ export const handler: Handler = async (event) => {
 Critères :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
-- Riche en protéines (35-50g par portion).
+- Riche en protéines : 45g à 65g de protéines par portion (profil musculation 84 kg).
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de : ${params.currentRecipe.title} et des autres repas déjà prévus : ${(params.otherRecipeTitles || []).join(', ')}.
 
@@ -37,8 +37,8 @@ Réponds avec ce schéma JSON exact pour UNE seule recette :
   "description": "Courte description",
   "prepTimeMinutes": 15,
   "cookTimeMinutes": 15,
-  "proteinGrams": 45,
-  "calories": 600,
+  "proteinGrams": 52,
+  "calories": 700,
   "ingredients": [
     { "name": "Ingrédient", "amount": "Quantité" }
   ],

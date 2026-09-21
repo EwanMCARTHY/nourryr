@@ -2,7 +2,8 @@ import type { MealPlan, Recipe, SavedMeal, Supermarket } from '../types';
 
 export interface GeneratePlanParams {
   numberOfDays: number;
-  mealsPerDay: number;
+  totalMeals: number;
+  mealsPerDay?: number;
   numberOfPeople: number;
   supermarket: Supermarket;
   budget: number;
@@ -18,12 +19,14 @@ export interface SwapRecipeParams {
   apiKey?: string;
 }
 
-const SYSTEM_INSTRUCTION = `Tu es un nutritionniste du sport et un chef cuisinier professionnel spécialisé dans l'alimentation pour la musculation, la prise de muscle sec et la performance sportive.
+const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
+
 Tes règles ABSOLUES :
-1. APPORTS PROTÉINÉS ÉLEVÉS : Chaque repas principal doit fournir entre 35g et 55g de protéines par portion (poulet, dinde, boeuf haché 5%, thon, oeufs, skyr, fromage blanc, lentilles, tofu, etc.).
-2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : pas de gratins au four, pas de quiches au four, pas de rôtis).
+1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion.
+   - Utilise des portions généreuses de protéines nobles : blancs de poulet/dinde (200g-250g/portion), bœuf haché 5%, thon au naturel (boîte entière), œufs entiers + blancs d'œufs, skyr 0%, fromage blanc, lentilles/haricots rouges en complément.
+2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : pas de cuisson au four, pas de gratins, pas de tartes ou rôtis).
 3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché). Optimise l'achat d'ingrédients de base partagés entre plusieurs repas pour éviter le gaspillage et respecter le budget.
-4. VARIÉTÉ ET GOÛT : Des repas savoureux, assaisonnés avec des épices simples, rapides et pratiques pour le quotidien.
+4. VARIÉTÉ ET GOÛT : Des repas savoureux, assaisonnés avec des épices simples (curry, paprika, ail, herbes de Provence, sauce soja...), rapides et pratiques pour le quotidien.
 5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 export async function generateMealPlan(params: GeneratePlanParams): Promise<MealPlan> {
@@ -46,15 +49,16 @@ export async function generateMealPlan(params: GeneratePlanParams): Promise<Meal
     throw new Error("Clé API Gemini manquante. Renseigne ta clé API gratuite dans les paramètres de l'application.");
   }
 
-  const prompt = `Génère un programme de repas complet avec les critères suivants :
-- Nombre de jours : ${params.numberOfDays}
-- Nombre de repas par jour : ${params.mealsPerDay} (ex: Déjeuner, Dîner${params.mealsPerDay === 3 ? ' + Collation protéinée' : ''})
-- Nombre de personnes : ${params.numberOfPeople}
+  const prompt = `Génère exactement ${params.totalMeals} repas protéinés répartis sur ${params.numberOfDays} jours avec les critères suivants :
+- Nombre de jours : ${params.numberOfDays} jours
+- Nombre TOTAL de repas à cuisiner : ${params.totalMeals} repas (répartis logiquement sur les jours 1 à ${params.numberOfDays}, Déjeuner ou Dîner)
+- Nombre de personnes : ${params.numberOfPeople} mangeurs
+- Objectif protéines : 45g à 65g de protéines par portion (athlète 84 kg)
 - Supermarché : ${params.supermarket}
 - Budget total max : ${params.budget} €
-${params.savedRecipes && params.savedRecipes.length > 0 ? `- Recettes favorites des utilisateurs (à réutiliser ou favoriser si pertinent) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
+${params.savedRecipes && params.savedRecipes.length > 0 ? `- Recettes favorites des utilisateurs (à réutiliser ou favoriser en priorité) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
 
-Réponds avec ce schéma JSON exact :
+Réponds avec ce schéma JSON exact (contenant exactement ${params.totalMeals} objets dans "recipes") :
 {
   "estimatedTotalCost": nombre (estimation réaliste en euros du caddie total chez ${params.supermarket}),
   "recipes": [
@@ -66,10 +70,10 @@ Réponds avec ce schéma JSON exact :
       "description": "Brève description alléchante",
       "prepTimeMinutes": 15,
       "cookTimeMinutes": 15,
-      "proteinGrams": 45,
-      "calories": 650,
+      "proteinGrams": 52,
+      "calories": 700,
       "ingredients": [
-        { "name": "Escalope de poulet", "amount": "300g" }
+        { "name": "Escalope de poulet", "amount": "450g (pour 2 pers)" }
       ],
       "instructions": [
         "Couper le poulet en dés...",
@@ -81,10 +85,10 @@ Réponds avec ce schéma JSON exact :
   "shoppingList": [
     {
       "id": "s1",
-      "name": "Blancs de poulet (paquet familial)",
-      "quantity": "1 kg",
+      "name": "Blancs de poulet (format familial)",
+      "quantity": "1.2 kg",
       "category": "Boucherie & Poissonnerie",
-      "estimatedPrice": 12.50
+      "estimatedPrice": 14.50
     }
   ]
 }
@@ -124,7 +128,8 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
     id: 'plan-' + Date.now(),
     createdAt: new Date().toISOString(),
     numberOfDays: params.numberOfDays,
-    mealsPerDay: params.mealsPerDay,
+    totalMeals: params.totalMeals,
+    mealsPerDay: Math.ceil(params.totalMeals / params.numberOfDays),
     numberOfPeople: params.numberOfPeople,
     supermarket: params.supermarket,
     budget: params.budget,
@@ -167,7 +172,7 @@ export async function swapRecipe(params: SwapRecipeParams): Promise<Recipe> {
 Critères :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
-- Riche en protéines (35-50g par portion).
+- Riche en protéines : 45g à 65g de protéines par portion (profil musculation 84 kg).
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de : ${params.currentRecipe.title} et des autres repas déjà prévus : ${params.otherRecipeTitles.join(', ')}.
 
@@ -177,8 +182,8 @@ Réponds avec ce schéma JSON exact pour UNE seule recette :
   "description": "Courte description",
   "prepTimeMinutes": 15,
   "cookTimeMinutes": 15,
-  "proteinGrams": 45,
-  "calories": 600,
+  "proteinGrams": 52,
+  "calories": 700,
   "ingredients": [
     { "name": "Ingrédient", "amount": "Quantité" }
   ],

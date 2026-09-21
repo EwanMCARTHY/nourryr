@@ -64,7 +64,7 @@ export function App() {
   // Handle plan generation
   const handleGenerate = async (params: {
     numberOfDays: number;
-    mealsPerDay: number;
+    totalMeals: number;
     numberOfPeople: number;
     supermarket: Supermarket;
     budget: number;

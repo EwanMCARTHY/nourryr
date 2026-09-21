@@ -84,7 +84,7 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="font-bold text-white">
-                {plan.numberOfDays} jours • {plan.numberOfPeople} pers.
+                {plan.recipes.length} repas • {plan.numberOfDays} jours • {plan.numberOfPeople} pers.
               </span>
               <span className="text-zinc-400">({plan.supermarket})</span>
             </div>

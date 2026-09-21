@@ -43,7 +43,8 @@ export interface MealPlan {
   id: string;
   createdAt: string;
   numberOfDays: number;
-  mealsPerDay: number;
+  totalMeals: number;
+  mealsPerDay?: number;
   numberOfPeople: number;
   supermarket: Supermarket;
   budget: number;
