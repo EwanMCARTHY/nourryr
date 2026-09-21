@@ -26,14 +26,66 @@ export interface SwapRecipeResult {
   estimatedTotalCost: number;
 }
 
+const FALLBACK_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+];
+
 const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
 
 Tes règles ABSOLUES :
 1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion (portions généreuses de volaille 200-250g, bœuf haché 5%, thon, œufs, skyr, etc.).
 2. ÉQUIPEMENT DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : aucun gratin, quiche, rôti ou plat au four).
 3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché). Optimise l'achat d'ingrédients de base partagés entre plusieurs repas pour éviter le gaspillage.
-4. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse de recette, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
+4. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse de repas, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
 5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
+
+async function callGeminiWithFallback(apiKey: string, prompt: string, systemInstruction: string, temperature = 0.7): Promise<any> {
+  let lastError = '';
+
+  for (const model of FALLBACK_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          return JSON.parse(rawText);
+        }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        const errMsg = errData?.error?.message || `Status ${response.status}`;
+        lastError = errMsg;
+        // If overloaded (503/429), try next model in fallback list
+        if (response.status === 503 || response.status === 429 || response.status === 404) {
+          console.warn(`Modèle ${model} indisponible (${response.status}), basculement automatique sur le modèle suivant...`);
+          continue;
+        }
+        throw new Error(errMsg);
+      }
+    } catch (e: any) {
+      lastError = e.message || 'Erreur réseau';
+      console.warn(`Échec avec ${model}:`, e);
+    }
+  }
+
+  throw new Error(`Tous les modèles sont actuellement occupés : ${lastError}`);
+}
 
 export async function generateMealPlan(params: GeneratePlanParams): Promise<MealPlan> {
   const apiKey = params.apiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
@@ -58,7 +110,7 @@ export async function generateMealPlan(params: GeneratePlanParams): Promise<Meal
   const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
 Supermarché : ${params.supermarket}
 Budget total max : ${params.budget} €
-Objectif : 45g à 65g de protéines par portion.
+Objectif : 45g à 65g de protéines par portion (athlète 84 kg).
 Pas de four (uniquement poêle, plaques, casserole, micro-ondes).
 Pas de texte de description pour les repas.
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
@@ -99,33 +151,7 @@ Réponds avec ce schéma JSON exact :
 Les catégories autorisées pour la shoppingList sont STRICTEMENT :
 "Boucherie & Poissonnerie", "Crémerie & Œufs", "Fruits & Légumes", "Épicerie & Féculents", "Condiments & Autres".`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.7,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || `Erreur API Gemini (${response.status})`);
-  }
-
-  const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) {
-    throw new Error("Réponse vide de l'IA. Réessaie avec des paramètres légèrement différents.");
-  }
-
-  const parsed = JSON.parse(rawText);
+  const parsed = await callGeminiWithFallback(apiKey, prompt, SYSTEM_INSTRUCTION, 0.7);
 
   const mealPlan: MealPlan = {
     id: 'plan-' + Date.now(),
@@ -215,29 +241,7 @@ Réponds avec ce schéma JSON exact :
   "estimatedTotalCost": nombre
 }`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.8,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || `Erreur lors du remplacement (${response.status})`);
-  }
-
-  const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  const parsed = JSON.parse(rawText);
+  const parsed = await callGeminiWithFallback(apiKey, prompt, SYSTEM_INSTRUCTION, 0.8);
 
   // Preserve checked state from current shopping list if items still match
   const checkedMap = new Map<string, boolean>();

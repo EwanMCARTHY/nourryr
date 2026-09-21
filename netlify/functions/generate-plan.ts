@@ -1,5 +1,12 @@
 import type { Handler } from '@netlify/functions';
 
+const FALLBACK_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+];
+
 const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
 
 Tes règles ABSOLUES :
@@ -28,7 +35,7 @@ export const handler: Handler = async (event) => {
     const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
 Supermarché : ${params.supermarket}
 Budget total max : ${params.budget} €
-Objectif : 45g à 65g de protéines par portion.
+Objectif : 45g à 65g de protéines par portion (athlète 84 kg).
 Pas de four (uniquement poêle, plaques, casserole, micro-ondes).
 Pas de texte de description pour les repas.
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map((r: any) => r.title).join(', ')}` : ''}
@@ -69,29 +76,49 @@ Réponds avec ce schéma JSON exact :
 Les catégories autorisées pour la shoppingList sont STRICTEMENT :
 "Boucherie & Poissonnerie", "Crémerie & Œufs", "Fruits & Légumes", "Épicerie & Féculents", "Condiments & Autres".`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+    let parsed: any = null;
+    let lastErr = '';
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.7,
-        },
-      }),
-    });
+    for (const model of FALLBACK_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.7,
+            },
+          }),
+        });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return { statusCode: response.status, body: err };
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            parsed = JSON.parse(rawText);
+            break;
+          }
+        } else {
+          lastErr = `Status ${response.status}`;
+          if (response.status === 503 || response.status === 429 || response.status === 404) {
+            continue; // try next model
+          }
+        }
+      } catch (e: any) {
+        lastErr = e.message;
+      }
     }
 
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(rawText);
+    if (!parsed) {
+      return {
+        statusCode: 503,
+        body: JSON.stringify({ error: `Tous les modèles Gemini sont momentanément saturés (${lastErr}). Réessaie dans quelques secondes.` }),
+      };
+    }
 
     const mealPlan = {
       id: 'plan-' + Date.now(),

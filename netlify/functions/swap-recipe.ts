@@ -1,5 +1,12 @@
 import type { Handler } from '@netlify/functions';
 
+const FALLBACK_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+];
+
 const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
 Tes règles ABSOLUES :
 1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS : Chaque repas principal doit fournir STRICTEMENT entre 45g et 65g de protéines par portion (poulet, dinde, boeuf haché 5%, thon, oeufs, skyr, etc.).
@@ -34,7 +41,7 @@ Critères du nouveau plat :
 - Supermarché : ${params.supermarket}
 - Riche en protéines : 45g à 65g de protéines par portion (musculation 84 kg).
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
-- Recette différente de "${params.currentRecipe.title}" et des autres plats déjà prévus : ${otherTitles.join(', ')}.
+- Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
 
 ADAPTATION DE LA LISTE DE COURSES :
 - Ajuste la liste de courses globale pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
@@ -68,29 +75,49 @@ Réponds avec ce schéma JSON exact :
   "estimatedTotalCost": nombre
 }`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+    let parsed: any = null;
+    let lastErr = '';
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.8,
-        },
-      }),
-    });
+    for (const model of FALLBACK_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.8,
+            },
+          }),
+        });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return { statusCode: response.status, body: err };
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            parsed = JSON.parse(rawText);
+            break;
+          }
+        } else {
+          lastErr = `Status ${response.status}`;
+          if (response.status === 503 || response.status === 429 || response.status === 404) {
+            continue; // try next model
+          }
+        }
+      } catch (e: any) {
+        lastErr = e.message;
+      }
     }
 
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(rawText);
+    if (!parsed) {
+      return {
+        statusCode: 503,
+        body: JSON.stringify({ error: `Tous les modèles Gemini sont momentanément saturés (${lastErr}). Réessaie dans quelques secondes.` }),
+      };
+    }
 
     const checkedMap = new Map<string, boolean>();
     (params.currentShoppingList || []).forEach((item: any) => {
