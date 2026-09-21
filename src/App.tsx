@@ -13,6 +13,8 @@ import {
   fetchSavedMeals,
   addSavedMeal,
   removeSavedMeal,
+  fetchCustomPrices,
+  saveCustomPrice,
 } from './lib/storage';
 import { AlertCircle } from 'lucide-react';
 
@@ -91,9 +93,11 @@ export function App() {
 
     try {
       const apiKey = localStorage.getItem('nourryr_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
+      const customPrices = await fetchCustomPrices();
       const plan = await generateMealPlan({
         ...params,
         savedRecipes: savedMeals,
+        customPrices,
         apiKey,
       });
 
@@ -141,6 +145,7 @@ export function App() {
 
     try {
       const apiKey = localStorage.getItem('nourryr_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
+      const customPrices = await fetchCustomPrices();
 
       const result = await swapRecipe({
         currentRecipe: recipe,
@@ -149,6 +154,7 @@ export function App() {
         numberOfPeople: activePlan.numberOfPeople,
         supermarket: activePlan.supermarket,
         budget: activePlan.budget,
+        customPrices,
         apiKey,
       });
 
@@ -170,6 +176,41 @@ export function App() {
       setErrorMessage(err.message || 'Impossible de remplacer la recette.');
     } finally {
       setSwappingRecipeId(null);
+    }
+  };
+
+  // Update item price in shopping list and sync to custom prices database
+  const handleUpdateItemPrice = async (itemId: string, newPrice: number) => {
+    if (!activePlan) return;
+
+    let targetItemName = '';
+    const updatedShoppingList = activePlan.shoppingList.map(item => {
+      if (item.id === itemId) {
+        targetItemName = item.name;
+        return {
+          ...item,
+          estimatedPrice: newPrice,
+          isUserPrice: true,
+        };
+      }
+      return item;
+    });
+
+    const newEstimatedTotal = Number(
+      updatedShoppingList.reduce((sum, item) => sum + item.estimatedPrice, 0).toFixed(2)
+    );
+
+    const updatedPlan: MealPlan = {
+      ...activePlan,
+      shoppingList: updatedShoppingList,
+      estimatedTotalCost: newEstimatedTotal,
+    };
+
+    setActivePlan(updatedPlan);
+    await saveCurrentPlan(updatedPlan);
+
+    if (targetItemName) {
+      await saveCustomPrice(targetItemName, newPrice);
     }
   };
 
@@ -285,6 +326,7 @@ export function App() {
             onToggleSave={handleToggleSave}
             onSwapRecipe={handleSwapRecipe}
             onToggleShoppingItem={handleToggleShoppingItem}
+            onUpdateItemPrice={handleUpdateItemPrice}
             onResetShoppingChecks={handleResetShoppingChecks}
             onDeletePlan={handleResetPlan}
             swappingRecipeId={swappingRecipeId}

@@ -35,6 +35,8 @@ export const handler: Handler = async (event) => {
       .filter((r: any) => r.id !== params.currentRecipe.id)
       .map((r: any) => r.title);
 
+    const customPrices = params.customPrices || {};
+
     const prompt = `L'utilisateur souhaite remplacer le repas "${params.currentRecipe.title}" (Repas n°${params.currentRecipe.mealIndex || 1}).
 Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
@@ -43,9 +45,11 @@ Critères du nouveau plat :
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
 
-ADAPTATION DE LA LISTE DE COURSES :
-- Ajuste la liste de courses globale pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
+ADAPTATION DE LA LISTE DE COURSES GRANULAIRE :
+- Ajuste la liste de courses article par article pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
+- Détaille article par article avec marque distributeur (${params.supermarket}), conditionnement et prix unitaire réaliste.
 - Essaie en priorité de réutiliser des ingrédients déjà achetés dans le reste du panier pour respecter le budget max de ${params.budget} €.
+${Object.keys(customPrices).length > 0 ? `PRIX CONNUS DE L'UTILISATEUR : ${JSON.stringify(customPrices)}` : ''}
 
 Réponds avec ce schéma JSON exact :
 {
@@ -66,10 +70,12 @@ Réponds avec ce schéma JSON exact :
   },
   "updatedShoppingList": [
     {
-      "name": "Nom ingrédient",
+      "name": "Nom ingrédient précis",
       "quantity": "Quantité globale",
+      "brand": "Marque",
+      "unitDetails": "Format packaging",
       "category": "Boucherie & Poissonnerie",
-      "estimatedPrice": 12.00
+      "estimatedPrice": 7.50
     }
   ],
   "estimatedTotalCost": nombre
@@ -124,14 +130,33 @@ Réponds avec ce schéma JSON exact :
       checkedMap.set(item.name?.toLowerCase()?.trim(), item.checked);
     });
 
-    const updatedShoppingList = (parsed.updatedShoppingList || []).map((s: any, idx: number) => ({
-      id: 'shop-' + (idx + 1) + '-' + Date.now(),
-      name: s.name,
-      quantity: s.quantity,
-      category: s.category || 'Épicerie & Féculents',
-      checked: checkedMap.get(s.name?.toLowerCase()?.trim()) || false,
-      estimatedPrice: s.estimatedPrice,
-    }));
+    const updatedShoppingList = (parsed.updatedShoppingList || []).map((s: any, idx: number) => {
+      const normName = s.name?.toLowerCase()?.trim() || '';
+      let finalPrice = Number(s.estimatedPrice) || 3.0;
+      let isUserPrice = false;
+
+      for (const [knownName, knownPrice] of Object.entries(customPrices)) {
+        if (normName.includes(knownName.toLowerCase()) || knownName.toLowerCase().includes(normName)) {
+          finalPrice = Number(knownPrice);
+          isUserPrice = true;
+          break;
+        }
+      }
+
+      return {
+        id: 'shop-' + (idx + 1) + '-' + Date.now(),
+        name: s.name,
+        quantity: s.quantity,
+        brand: s.brand,
+        unitDetails: s.unitDetails,
+        category: s.category || 'Épicerie & Féculents',
+        checked: checkedMap.get(normName) || false,
+        estimatedPrice: Number(finalPrice.toFixed(2)),
+        isUserPrice,
+      };
+    });
+
+    const totalCost = updatedShoppingList.reduce((sum: number, item: any) => sum + item.estimatedPrice, 0);
 
     const newRecipe = {
       ...parsed.newRecipe,
@@ -146,7 +171,7 @@ Réponds avec ce schéma JSON exact :
       body: JSON.stringify({
         newRecipe,
         updatedShoppingList: updatedShoppingList.length > 0 ? updatedShoppingList : params.currentShoppingList,
-        estimatedTotalCost: parsed.estimatedTotalCost || params.budget,
+        estimatedTotalCost: Number(totalCost.toFixed(2)) || parsed.estimatedTotalCost || params.budget,
       }),
     };
   } catch (err: any) {

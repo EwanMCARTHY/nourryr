@@ -11,6 +11,7 @@ interface MealPlanViewProps {
   onToggleSave: (recipe: Recipe) => Promise<void>;
   onSwapRecipe: (recipe: Recipe) => Promise<void>;
   onToggleShoppingItem: (id: string) => void;
+  onUpdateItemPrice: (itemId: string, newPrice: number) => void;
   onResetShoppingChecks: () => void;
   onDeletePlan: () => void;
   swappingRecipeId: string | null;
@@ -22,6 +23,7 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
   onToggleSave,
   onSwapRecipe,
   onToggleShoppingItem,
+  onUpdateItemPrice,
   onResetShoppingChecks,
   onDeletePlan,
   swappingRecipeId,
@@ -135,6 +137,7 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
         <ShoppingListView
           items={plan.shoppingList}
           onToggleItem={onToggleShoppingItem}
+          onUpdatePrice={onUpdateItemPrice}
           supermarket={plan.supermarket}
           budget={plan.budget}
           estimatedCost={plan.estimatedTotalCost}

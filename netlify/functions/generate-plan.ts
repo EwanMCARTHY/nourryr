@@ -32,6 +32,8 @@ export const handler: Handler = async (event) => {
   try {
     const params = JSON.parse(event.body || '{}');
 
+    const customPrices = params.customPrices || {};
+
     const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
 Supermarché : ${params.supermarket}
 Budget total max : ${params.budget} €
@@ -39,6 +41,10 @@ Objectif : 45g à 65g de protéines par portion (athlète 84 kg).
 Pas de four (uniquement poêle, plaques, casserole, micro-ondes).
 Pas de texte de description pour les repas.
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map((r: any) => r.title).join(', ')}` : ''}
+${Object.keys(customPrices).length > 0 ? `PRIX CONNUS ET VÉRIFIÉS EN MAGASIN PAR L'UTILISATEUR (utilise ces prix en priorité) :\n${JSON.stringify(customPrices, null, 2)}` : ''}
+
+Exigences liste de courses :
+Détaille article par article sans regrouper de manière vague. Précise le nom, la marque de distributeur (${params.supermarket}), le format/packaging exact et le prix unitaire réaliste.
 
 Réponds avec ce schéma JSON exact :
 {
@@ -64,11 +70,12 @@ Réponds avec ce schéma JSON exact :
   ],
   "shoppingList": [
     {
-      "id": "s1",
-      "name": "Blancs de dinde (format familial)",
-      "quantity": "1.2 kg",
+      "name": "Filets de dinde",
+      "quantity": "2 barquettes de 500g",
+      "brand": "Marque Repère (Ronsard)",
+      "unitDetails": "Barquette 500g",
       "category": "Boucherie & Poissonnerie",
-      "estimatedPrice": 14.50
+      "estimatedPrice": 7.40
     }
   ]
 }
@@ -120,6 +127,34 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
       };
     }
 
+    const shoppingList = (parsed.shoppingList || []).map((s: any, idx: number) => {
+      const normName = s.name?.toLowerCase()?.trim() || '';
+      let finalPrice = Number(s.estimatedPrice) || 3.0;
+      let isUserPrice = false;
+
+      for (const [knownName, knownPrice] of Object.entries(customPrices)) {
+        if (normName.includes(knownName.toLowerCase()) || knownName.toLowerCase().includes(normName)) {
+          finalPrice = Number(knownPrice);
+          isUserPrice = true;
+          break;
+        }
+      }
+
+      return {
+        id: s.id || 'shop-' + (idx + 1) + '-' + Date.now(),
+        name: s.name,
+        quantity: s.quantity,
+        brand: s.brand,
+        unitDetails: s.unitDetails,
+        category: s.category || 'Épicerie & Féculents',
+        checked: false,
+        estimatedPrice: Number(finalPrice.toFixed(2)),
+        isUserPrice,
+      };
+    });
+
+    const totalCost = shoppingList.reduce((sum: number, item: any) => sum + item.estimatedPrice, 0);
+
     const mealPlan = {
       id: 'plan-' + Date.now(),
       createdAt: new Date().toISOString(),
@@ -128,18 +163,14 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
       numberOfPeople: params.numberOfPeople,
       supermarket: params.supermarket,
       budget: params.budget,
-      estimatedTotalCost: parsed.estimatedTotalCost || params.budget,
+      estimatedTotalCost: Number(totalCost.toFixed(2)) || parsed.estimatedTotalCost || params.budget,
       recipes: (parsed.recipes || []).map((r: any, idx: number) => ({
         ...r,
         id: r.id || 'recipe-' + (idx + 1) + '-' + Date.now(),
         mealIndex: idx + 1,
         equipmentUsed: r.equipmentUsed || ['Poêle', 'Plaques'],
       })),
-      shoppingList: (parsed.shoppingList || []).map((s: any, idx: number) => ({
-        ...s,
-        id: s.id || 'shop-' + (idx + 1) + '-' + Date.now(),
-        checked: false,
-      })),
+      shoppingList,
     };
 
     return {

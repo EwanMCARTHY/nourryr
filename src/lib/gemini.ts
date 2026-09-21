@@ -7,6 +7,7 @@ export interface GeneratePlanParams {
   supermarket: Supermarket;
   budget: number;
   savedRecipes?: SavedMeal[];
+  customPrices?: Record<string, number>;
   apiKey?: string;
 }
 
@@ -17,6 +18,7 @@ export interface SwapRecipeParams {
   numberOfPeople: number;
   supermarket: Supermarket;
   budget: number;
+  customPrices?: Record<string, number>;
   apiKey?: string;
 }
 
@@ -38,9 +40,14 @@ const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisini
 Tes règles ABSOLUES :
 1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion (portions généreuses de volaille 200-250g, bœuf haché 5%, thon, œufs, skyr, etc.).
 2. ÉQUIPEMENT DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : aucun gratin, quiche, rôti ou plat au four).
-3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché). Optimise l'achat d'ingrédients de base partagés entre plusieurs repas pour éviter le gaspillage.
-4. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse de repas, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
-5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
+3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
+4. LISTE DE COURSES GRANULAIRE ET ULTRA DÉTAILLÉE :
+   - Évite les regroupements vagues : détaille élément par élément pour qu'on sache exactement quoi prendre en rayon.
+   - Mentionne la marque typique du magasin (ex: Marque Repère/Eco+ chez E.Leclerc, Monique Ranou/Pâturages chez Intermarché, Marque Auchan/Pouce chez Auchan).
+   - Précise le conditionnement précis (ex: "Barquette 4x100g", "Bocal 400g", "Paquet 1kg", "Boîte de 10 œufs").
+   - Donne un prix unitaire réaliste en euros pour ce produit précis.
+5. SOBRIÉTÉ : Pas de description verbeuse de repas, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
+6. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 async function callGeminiWithFallback(apiKey: string, prompt: string, systemInstruction: string, temperature = 0.7): Promise<any> {
   let lastError = '';
@@ -71,16 +78,13 @@ async function callGeminiWithFallback(apiKey: string, prompt: string, systemInst
         const errData = await response.json().catch(() => ({}));
         const errMsg = errData?.error?.message || `Status ${response.status}`;
         lastError = errMsg;
-        // If overloaded (503/429), try next model in fallback list
         if (response.status === 503 || response.status === 429 || response.status === 404) {
-          console.warn(`Modèle ${model} indisponible (${response.status}), basculement automatique sur le modèle suivant...`);
           continue;
         }
         throw new Error(errMsg);
       }
     } catch (e: any) {
       lastError = e.message || 'Erreur réseau';
-      console.warn(`Échec avec ${model}:`, e);
     }
   }
 
@@ -90,7 +94,6 @@ async function callGeminiWithFallback(apiKey: string, prompt: string, systemInst
 export async function generateMealPlan(params: GeneratePlanParams): Promise<MealPlan> {
   const apiKey = params.apiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
 
-  // Check if Netlify function is available, else fallback to direct Gemini API
   if (!apiKey) {
     try {
       const res = await fetch('/.netlify/functions/generate-plan', {
@@ -102,7 +105,7 @@ export async function generateMealPlan(params: GeneratePlanParams): Promise<Meal
         return await res.json();
       }
     } catch {
-      // Fall through to direct API error
+      // Fall through
     }
     throw new Error("Clé API Gemini manquante. Renseigne ta clé API dans les paramètres ⚙️.");
   }
@@ -114,10 +117,14 @@ Objectif : 45g à 65g de protéines par portion (athlète 84 kg).
 Pas de four (uniquement poêle, plaques, casserole, micro-ondes).
 Pas de texte de description pour les repas.
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
+${params.customPrices && Object.keys(params.customPrices).length > 0 ? `PRIX CONNUS ET VÉRIFIÉS EN MAGASIN PAR L'UTILISATEUR (utilise ces prix en priorité) :\n${JSON.stringify(params.customPrices, null, 2)}` : ''}
+
+Exigences liste de courses :
+Détaille article par article sans regrouper de manière vague. Précise le nom, la marque de distributeur (${params.supermarket}), le format/packaging exact et le prix unitaire réaliste.
 
 Réponds avec ce schéma JSON exact :
 {
-  "estimatedTotalCost": nombre (estimation en euros chez ${params.supermarket}),
+  "estimatedTotalCost": nombre,
   "recipes": [
     {
       "id": "r1",
@@ -139,11 +146,12 @@ Réponds avec ce schéma JSON exact :
   ],
   "shoppingList": [
     {
-      "id": "s1",
-      "name": "Blancs de dinde (format familial)",
-      "quantity": "1.2 kg",
+      "name": "Filets de dinde",
+      "quantity": "2 barquettes de 500g",
+      "brand": "Marque Repère (Ronsard)",
+      "unitDetails": "Barquette 500g",
       "category": "Boucherie & Poissonnerie",
-      "estimatedPrice": 14.50
+      "estimatedPrice": 7.40
     }
   ]
 }
@@ -153,6 +161,37 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
 
   const parsed = await callGeminiWithFallback(apiKey, prompt, SYSTEM_INSTRUCTION, 0.7);
 
+  // Apply custom prices if user previously taught us a real in-store price
+  const customMap = params.customPrices || {};
+
+  const shoppingList: ShoppingItem[] = (parsed.shoppingList || []).map((s: any, idx: number) => {
+    const normName = s.name?.toLowerCase()?.trim() || '';
+    let finalPrice = Number(s.estimatedPrice) || 3.0;
+    let isUserPrice = false;
+
+    for (const [knownName, knownPrice] of Object.entries(customMap)) {
+      if (normName.includes(knownName) || knownName.includes(normName)) {
+        finalPrice = knownPrice;
+        isUserPrice = true;
+        break;
+      }
+    }
+
+    return {
+      id: s.id || 'shop-' + (idx + 1) + '-' + Date.now(),
+      name: s.name,
+      quantity: s.quantity,
+      brand: s.brand,
+      unitDetails: s.unitDetails,
+      category: s.category || 'Épicerie & Féculents',
+      checked: false,
+      estimatedPrice: Number(finalPrice.toFixed(2)),
+      isUserPrice,
+    };
+  });
+
+  const totalCost = shoppingList.reduce((sum, item) => sum + item.estimatedPrice, 0);
+
   const mealPlan: MealPlan = {
     id: 'plan-' + Date.now(),
     createdAt: new Date().toISOString(),
@@ -161,18 +200,14 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
     numberOfPeople: params.numberOfPeople,
     supermarket: params.supermarket,
     budget: params.budget,
-    estimatedTotalCost: parsed.estimatedTotalCost || params.budget,
+    estimatedTotalCost: Number(totalCost.toFixed(2)) || parsed.estimatedTotalCost || params.budget,
     recipes: (parsed.recipes || []).map((r: any, idx: number) => ({
       ...r,
       id: r.id || 'recipe-' + (idx + 1) + '-' + Date.now(),
       mealIndex: idx + 1,
       equipmentUsed: r.equipmentUsed || ['Poêle', 'Plaques'],
     })),
-    shoppingList: (parsed.shoppingList || []).map((s: any, idx: number) => ({
-      ...s,
-      id: s.id || 'shop-' + (idx + 1) + '-' + Date.now(),
-      checked: false,
-    })),
+    shoppingList,
   };
 
   return mealPlan;
@@ -209,9 +244,11 @@ Critères du nouveau plat :
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
 
-ADAPTATION DE LA LISTE DE COURSES :
-- Ajuste la liste de courses globale pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
+ADAPTATION DE LA LISTE DE COURSES GRANULAIRE :
+- Ajuste la liste de courses article par article pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
+- Détaille article par article avec marque distributeur (${params.supermarket}), conditionnement et prix unitaire réaliste.
 - Essaie en priorité de réutiliser des ingrédients déjà achetés dans le reste du panier pour respecter le budget max de ${params.budget} €.
+${params.customPrices && Object.keys(params.customPrices).length > 0 ? `PRIX CONNUS DE L'UTILISATEUR : ${JSON.stringify(params.customPrices)}` : ''}
 
 Réponds avec ce schéma JSON exact :
 {
@@ -232,10 +269,12 @@ Réponds avec ce schéma JSON exact :
   },
   "updatedShoppingList": [
     {
-      "name": "Nom ingrédient",
+      "name": "Nom ingrédient précis",
       "quantity": "Quantité globale",
+      "brand": "Marque",
+      "unitDetails": "Format packaging",
       "category": "Boucherie & Poissonnerie",
-      "estimatedPrice": 12.00
+      "estimatedPrice": 7.50
     }
   ],
   "estimatedTotalCost": nombre
@@ -243,23 +282,40 @@ Réponds avec ce schéma JSON exact :
 
   const parsed = await callGeminiWithFallback(apiKey, prompt, SYSTEM_INSTRUCTION, 0.8);
 
-  // Preserve checked state from current shopping list if items still match
+  const customMap = params.customPrices || {};
   const checkedMap = new Map<string, boolean>();
   params.currentShoppingList.forEach(item => {
     checkedMap.set(item.name.toLowerCase().trim(), item.checked);
   });
 
   const updatedShoppingList: ShoppingItem[] = (parsed.updatedShoppingList || []).map((s: any, idx: number) => {
-    const isChecked = checkedMap.get(s.name?.toLowerCase()?.trim()) || false;
+    const normName = s.name?.toLowerCase()?.trim() || '';
+    let finalPrice = Number(s.estimatedPrice) || 3.0;
+    let isUserPrice = false;
+
+    for (const [knownName, knownPrice] of Object.entries(customMap)) {
+      if (normName.includes(knownName) || knownName.includes(normName)) {
+        finalPrice = knownPrice;
+        isUserPrice = true;
+        break;
+      }
+    }
+
+    const isChecked = checkedMap.get(normName) || false;
     return {
       id: 'shop-' + (idx + 1) + '-' + Date.now(),
       name: s.name,
       quantity: s.quantity,
+      brand: s.brand,
+      unitDetails: s.unitDetails,
       category: s.category || 'Épicerie & Féculents',
       checked: isChecked,
-      estimatedPrice: s.estimatedPrice,
+      estimatedPrice: Number(finalPrice.toFixed(2)),
+      isUserPrice,
     };
   });
+
+  const totalCost = updatedShoppingList.reduce((sum, item) => sum + item.estimatedPrice, 0);
 
   const newRecipe: Recipe = {
     ...parsed.newRecipe,
@@ -271,6 +327,6 @@ Réponds avec ce schéma JSON exact :
   return {
     newRecipe,
     updatedShoppingList: updatedShoppingList.length > 0 ? updatedShoppingList : params.currentShoppingList,
-    estimatedTotalCost: parsed.estimatedTotalCost || params.budget,
+    estimatedTotalCost: Number(totalCost.toFixed(2)) || parsed.estimatedTotalCost || params.budget,
   };
 }

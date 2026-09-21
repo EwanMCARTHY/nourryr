@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import type { GroceryCategory, ShoppingItem, Supermarket } from '../types';
-import { Check, Copy, CheckCheck, ShoppingBag, Store, Filter, RefreshCw } from 'lucide-react';
+import { Check, Copy, CheckCheck, ShoppingBag, Store, Filter, RefreshCw, Pencil, X, Tag } from 'lucide-react';
 
 interface ShoppingListViewProps {
   items: ShoppingItem[];
   onToggleItem: (id: string) => void;
+  onUpdatePrice?: (itemId: string, newPrice: number) => void;
   supermarket: Supermarket;
   budget: number;
   estimatedCost: number;
@@ -30,6 +31,7 @@ const CATEGORY_ICONS: Record<GroceryCategory, string> = {
 export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
   items,
   onToggleItem,
+  onUpdatePrice,
   supermarket,
   budget,
   estimatedCost,
@@ -37,6 +39,21 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
 }) => {
   const [hideChecked, setHideChecked] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editPriceValue, setEditPriceValue] = useState<string>('');
+
+  const handleStartEdit = (item: ShoppingItem) => {
+    setEditingItemId(item.id);
+    setEditPriceValue(item.estimatedPrice.toString());
+  };
+
+  const handleConfirmEdit = (itemId: string) => {
+    const parsed = parseFloat(editPriceValue.replace(',', '.'));
+    if (!isNaN(parsed) && parsed >= 0 && onUpdatePrice) {
+      onUpdatePrice(itemId, Number(parsed.toFixed(2)));
+    }
+    setEditingItemId(null);
+  };
 
   const checkedCount = items.filter(i => i.checked).length;
   const progressPercent = items.length > 0 ? Math.round((checkedCount / items.length) * 100) : 0;
@@ -191,10 +208,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                         : 'bg-zinc-900/80 border-zinc-800/90 text-zinc-100 hover:border-zinc-700'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
                       {/* Checkbox button */}
                       <div
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                        className={`w-6 h-6 rounded-lg shrink-0 flex items-center justify-center transition-all ${
                           item.checked
                             ? 'bg-emerald-500 text-zinc-950 shadow-sm shadow-emerald-500/30'
                             : 'border-2 border-zinc-700 bg-zinc-800/60'
@@ -203,19 +220,98 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                         {item.checked && <Check className="w-4 h-4 stroke-[3]" />}
                       </div>
 
-                      <span
-                        className={`text-xs font-medium ${
-                          item.checked ? 'line-through text-zinc-500' : 'text-zinc-100'
-                        }`}
-                      >
-                        {item.name}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`text-xs font-semibold ${
+                              item.checked ? 'line-through text-zinc-500' : 'text-zinc-100'
+                            }`}
+                          >
+                            {item.name}
+                          </span>
+                          {item.isUserPrice && (
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded">
+                              Prix vérifié
+                            </span>
+                          )}
+                        </div>
+
+                        {(item.brand || item.unitDetails) && (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-[11px] text-zinc-400">
+                            {item.brand && (
+                              <span className="text-zinc-400 flex items-center gap-1 font-medium">
+                                <Tag className="w-2.5 h-2.5 text-zinc-500" />
+                                {item.brand}
+                              </span>
+                            )}
+                            {item.brand && item.unitDetails && <span>•</span>}
+                            {item.unitDetails && (
+                              <span className="text-zinc-500">{item.unitDetails}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-emerald-400/90 px-2 py-0.5 rounded bg-zinc-800/80">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs font-bold text-emerald-400/90 px-2 py-1 rounded-lg bg-zinc-800/80">
                         {item.quantity}
                       </span>
+
+                      {editingItemId === item.id ? (
+                        <div
+                          onClick={e => e.stopPropagation()}
+                          className="flex items-center gap-1 bg-zinc-950 border border-emerald-500/80 rounded-lg p-0.5"
+                        >
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            value={editPriceValue}
+                            onChange={e => setEditPriceValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleConfirmEdit(item.id);
+                              if (e.key === 'Escape') setEditingItemId(null);
+                            }}
+                            autoFocus
+                            className="w-14 px-1.5 py-0.5 text-xs bg-transparent text-white font-bold outline-none"
+                          />
+                          <span className="text-xs text-zinc-400 mr-1">€</span>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmEdit(item.id)}
+                            className="p-1 rounded bg-emerald-500 text-zinc-950 hover:bg-emerald-400 transition-colors"
+                            title="Valider le prix"
+                          >
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingItemId(null)}
+                            className="p-1 rounded text-zinc-400 hover:text-white transition-colors"
+                            title="Annuler"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleStartEdit(item);
+                          }}
+                          className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                            item.isUserPrice
+                              ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25'
+                              : 'bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white'
+                          }`}
+                          title="Cliquer pour corriger le prix réel en magasin"
+                        >
+                          <span>{item.estimatedPrice.toFixed(2)} €</span>
+                          <Pencil className="w-2.5 h-2.5 opacity-60" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

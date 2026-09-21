@@ -14,8 +14,7 @@ export interface RecipeIngredient {
 
 export interface Recipe {
   id: string;
-  mealIndex?: number; // Repas 1, Repas 2...
-  dayIndex?: number;
+  mealIndex?: number;
   title: string;
   prepTimeMinutes: number;
   cookTimeMinutes: number;
@@ -31,9 +30,12 @@ export interface ShoppingItem {
   id: string;
   name: string;
   quantity: string;
+  brand?: string; // Ex: 'Marque Repère (Ronsard / Rustica)'
+  unitDetails?: string; // Ex: 'Barquette 500g'
   category: GroceryCategory;
   checked: boolean;
-  estimatedPrice?: number;
+  estimatedPrice: number;
+  isUserPrice?: boolean; // Vrai si le prix a été modifié par l'utilisateur
 }
 
 export interface MealPlan {

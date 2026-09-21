@@ -3,6 +3,7 @@ import { getSupabaseClient } from './supabase';
 
 const LOCAL_PLAN_KEY = 'nourryr_active_plan';
 const LOCAL_FAVORITES_KEY = 'nourryr_saved_favorites';
+const LOCAL_PRICES_KEY = 'nourryr_custom_prices';
 
 export async function fetchCurrentPlan(): Promise<MealPlan | null> {
   const supabase = getSupabaseClient();
@@ -111,6 +112,47 @@ export async function removeSavedMeal(mealId: string): Promise<void> {
         .eq('id', mealId);
     } catch (e) {
       console.warn('Supabase remove favorite error', e);
+    }
+  }
+}
+
+export async function fetchCustomPrices(): Promise<Record<string, number>> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('nourryr_plan')
+        .select('data')
+        .eq('id', 'shared_custom_prices')
+        .maybeSingle();
+
+      if (!error && data?.data) {
+        localStorage.setItem(LOCAL_PRICES_KEY, JSON.stringify(data.data));
+        return data.data as Record<string, number>;
+      }
+    } catch (e) {
+      console.warn('Supabase fetch custom prices error', e);
+    }
+  }
+
+  const local = localStorage.getItem(LOCAL_PRICES_KEY);
+  return local ? JSON.parse(local) : {};
+}
+
+export async function saveCustomPrice(itemName: string, price: number): Promise<void> {
+  const current = await fetchCustomPrices();
+  const normalizedKey = itemName.toLowerCase().trim();
+  const updated = { ...current, [normalizedKey]: price };
+  localStorage.setItem(LOCAL_PRICES_KEY, JSON.stringify(updated));
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase
+        .from('nourryr_plan')
+        .upsert({ id: 'shared_custom_prices', data: updated, updated_at: new Date().toISOString() });
+    } catch (e) {
+      console.warn('Supabase save custom prices error', e);
     }
   }
 }
