@@ -3,7 +3,7 @@ import type { MealPlan, Recipe, SavedMeal } from '../types';
 import { RecipeCard } from './RecipeCard';
 import { RecipeModal } from './RecipeModal';
 import { ShoppingListView } from './ShoppingListView';
-import { Utensils, ShoppingCart, Dumbbell, Trash2 } from 'lucide-react';
+import { Utensils, ShoppingCart, Dumbbell, Trash2, Flame } from 'lucide-react';
 
 interface MealPlanViewProps {
   plan: MealPlan;
@@ -35,6 +35,10 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
   const totalProteinsAvg = plan.recipes.length > 0
     ? Math.round(plan.recipes.reduce((sum, r) => sum + r.proteinGrams, 0) / plan.recipes.length)
     : 52;
+
+  const totalCaloriesAvg = plan.recipes.length > 0
+    ? Math.round(plan.recipes.reduce((sum, r) => sum + (r.calories || 680), 0) / plan.recipes.length)
+    : 680;
 
   const checkedItemsCount = plan.shoppingList.filter(i => i.checked).length;
 
@@ -85,16 +89,21 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
           <span className="text-zinc-400">({plan.supermarket})</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-1 text-emerald-400 font-extrabold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
             <Dumbbell className="w-3.5 h-3.5" />
             <span>~{totalProteinsAvg}g prot</span>
           </div>
 
+          <div className="flex items-center gap-1 text-amber-400 font-extrabold bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+            <Flame className="w-3.5 h-3.5" />
+            <span>~{totalCaloriesAvg} kcal</span>
+          </div>
+
           <button
             type="button"
             onClick={onDeletePlan}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-zinc-800 active:scale-95 transition-all"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-zinc-800 active:scale-95 transition-all ml-1"
             title="Supprimer ce programme"
           >
             <Trash2 className="w-4 h-4" />

@@ -10,10 +10,14 @@ const FALLBACK_MODELS = [
 const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
 Tes règles ABSOLUES :
 1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS : Chaque repas principal doit fournir STRICTEMENT entre 45g et 65g de protéines par portion (poulet, dinde, boeuf haché 5%, thon, oeufs, skyr, etc.).
-2. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit).
-3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
-4. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse, pas de mention Déjeuner/Dîner.
-5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
+2. SATIÉTÉ MAXIMALE & ZÉRO SURPLUS CALORIQUE (VOLUME EATING) :
+   - Calories maîtrisées : STRICTEMENT entre 600 et 750 kcal par portion (aucun repas au-dessus de 750 kcal).
+   - Grand volume alimentaire : part abondante de légumes riches en fibres (200g à 300g par personne : brocolis, courgettes, haricots, épinards...) et féculents à haute satiété (pommes de terre, riz complet, lentilles...).
+   - Graisses de cuisson minimales (1 c. à café d'huile max par portion), liaisons légères (skyr, coulis de tomate sans sucre).
+3. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit).
+4. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
+5. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse, pas de mention Déjeuner/Dîner.
+6. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -42,6 +46,7 @@ Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
 - Riche en protéines : 45g à 65g de protéines par portion (musculation 84 kg).
+- Satiété maximale & zéro surplus calorique : calibrer STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal). Intégrer une belle portion de légumes rassasiants riches en fibres et eau (200g-300g) et féculents à haute satiété (pommes de terre, riz complet, lentilles...), sans excès de matières grasses.
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
 
@@ -58,7 +63,7 @@ Réponds avec ce schéma JSON exact :
     "prepTimeMinutes": 15,
     "cookTimeMinutes": 15,
     "proteinGrams": 52,
-    "calories": 700,
+    "calories": 680,
     "ingredients": [
       { "name": "Ingrédient", "amount": "Quantité" }
     ],

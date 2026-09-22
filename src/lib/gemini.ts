@@ -39,15 +39,20 @@ const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisini
 
 Tes règles ABSOLUES :
 1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS (PRISE DE MASSE MUSCULAIRE) : Chaque repas doit fournir STRICTEMENT entre 45g et 65g de protéines réelles par portion (portions généreuses de volaille 200-250g, bœuf haché 5%, thon, œufs, skyr, etc.).
-2. ÉQUIPEMENT DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : aucun gratin, quiche, rôti ou plat au four).
-3. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
-4. LISTE DE COURSES GRANULAIRE ET ULTRA DÉTAILLÉE :
+2. SATIÉTÉ MAXIMALE & ZÉRO SURPLUS CALORIQUE (VOLUME EATING) :
+   - Calories maîtrisées : STRICTEMENT entre 600 et 750 kcal par portion (aucun repas au-dessus de 750 kcal pour éliminer tout risque de surplus calorique ou de prise de gras).
+   - Grand volume alimentaire : chaque repas doit impérativement comporter une part abondante de légumes riches en fibres et en eau (200g à 300g par personne : brocolis, courgettes, haricots verts, épinards, poivrons, carottes, champignons, concassé de tomates...).
+   - Féculents à fort indice de satiété : pommes de terre (aliment n°1 de la satiété), riz basmati/complet, lentilles, pois chiches, pâtes complètes, flocons d'avoine.
+   - Limitation stricte des graisses cachées : 1 c. à café d'huile max par portion pour la cuisson. Lier les sauces avec du skyr, fromage blanc 0% ou coulis de tomate sans sucre. Assaisonner avec épices, herbes, ail, oignon, citron.
+3. ÉQUIPEMENT DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : aucun gratin, quiche, rôti ou plat au four).
+4. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
+5. LISTE DE COURSES GRANULAIRE ET ULTRA DÉTAILLÉE :
    - Évite les regroupements vagues : détaille élément par élément pour qu'on sache exactement quoi prendre en rayon.
    - Mentionne la marque typique du magasin (ex: Marque Repère/Eco+ chez E.Leclerc, Monique Ranou/Pâturages chez Intermarché, Marque Auchan/Pouce chez Auchan).
-   - Précise le conditionnement précis (ex: "Barquette 4x100g", "Bocal 400g", "Paquet 1kg", "Boîte de 10 œufs").
+   - Prrecise le conditionnement précis (ex: "Barquette 4x100g", "Bocal 400g", "Paquet 1kg", "Boîte de 10 œufs").
    - Donne un prix unitaire réaliste en euros pour ce produit précis.
-5. SOBRIÉTÉ : Pas de description verbeuse de repas, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
-6. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
+6. SOBRIÉTÉ : Pas de description verbeuse de repas, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
+7. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 async function callGeminiWithFallback(apiKey: string, prompt: string, systemInstruction: string, temperature = 0.7): Promise<any> {
   let lastError = '';
@@ -113,7 +118,11 @@ export async function generateMealPlan(params: GeneratePlanParams): Promise<Meal
   const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
 Supermarché : ${params.supermarket}
 Budget total max : ${params.budget} €
-Objectif : 45g à 65g de protéines par portion (athlète 84 kg).
+Objectifs nutritionnels & Satiété :
+- 45g à 65g de protéines réelles par portion (athlète 84 kg).
+- Satiété maximale & zéro surplus calorique : chaque repas doit apporter STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal pour éliminer tout risque de surplus).
+- Volume alimentaire élevé : chaque plat DOIT intégrer une généreuse portion de légumes rassasiants riches en fibres et eau (200g-300g par personne : brocolis, courgettes, haricots, champignons, épinards, sauce tomate nature...) et des féculents à fort pouvoir de satiété (pommes de terre, riz complet/basmati, lentilles...).
+- Matières grasses de cuisson strictement limitées (1 c. à café d'huile par personne), sans crème grasse (lier au skyr ou coulis de tomate).
 Pas de four (uniquement poêle, plaques, casserole, micro-ondes).
 Pas de texte de description pour les repas.
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
@@ -133,7 +142,7 @@ Réponds avec ce schéma JSON exact :
       "prepTimeMinutes": 15,
       "cookTimeMinutes": 15,
       "proteinGrams": 52,
-      "calories": 700,
+      "calories": 680,
       "ingredients": [
         { "name": "Escalope de dinde", "amount": "450g" }
       ],
@@ -241,6 +250,7 @@ Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
 - Riche en protéines : 45g à 65g de protéines par portion (musculation 84 kg).
+- Satiété maximale & zéro surplus calorique : calibrer STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal). Intégrer une belle portion de légumes rassasiants riches en fibres et eau (200g-300g) et féculents à haute satiété (pommes de terre, riz complet, lentilles...), sans excès de matières grasses.
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
 
@@ -257,7 +267,7 @@ Réponds avec ce schéma JSON exact :
     "prepTimeMinutes": 15,
     "cookTimeMinutes": 15,
     "proteinGrams": 52,
-    "calories": 700,
+    "calories": 680,
     "ingredients": [
       { "name": "Ingrédient", "amount": "Quantité" }
     ],
