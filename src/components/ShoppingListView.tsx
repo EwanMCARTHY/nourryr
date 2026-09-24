@@ -65,6 +65,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
 
   const checkedCount = items.filter(i => i.checked).length;
   const progressPercent = items.length > 0 ? Math.round((checkedCount / items.length) * 100) : 0;
+  const frozenCount = items.filter(i => {
+    const text = `${i.name} ${i.unitDetails || ''} ${i.brand || ''}`.toLowerCase();
+    return text.includes('surgel') || text.includes('congel');
+  }).length;
 
   // Group items by category
   const grouped = CATEGORY_ORDER.reduce((acc, cat) => {
@@ -116,15 +120,21 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
           </div>
         </div>
 
-        {/* Budget guarantee badge */}
-        <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px]">
+        {/* Budget guarantee & Freezer badge */}
+        <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
           <span className="text-zinc-400 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             <span>Gamme premier prix ({supermarket === 'E.Leclerc' ? 'Eco+' : supermarket === 'Intermarché' ? 'Top Budget' : 'Pouce'})</span>
           </span>
-          <span className={`font-semibold ${estimatedCost <= budget ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {estimatedCost <= budget ? '✓ Dans le budget' : 'Ajusté'}
-          </span>
+
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-0.5 rounded-md font-semibold text-[10px] ${frozenCount <= 3 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+              ❄️ {frozenCount}/3 surgelés max
+            </span>
+            <span className={`font-semibold ${estimatedCost <= budget ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {estimatedCost <= budget ? '✓ Dans le budget' : 'Ajusté'}
+            </span>
+          </div>
         </div>
 
         {/* Progress bar */}

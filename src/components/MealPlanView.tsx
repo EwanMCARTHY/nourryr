@@ -42,11 +42,11 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
   // Compute stats
   const totalProteinsAvg = plan.recipes.length > 0
     ? Math.round(plan.recipes.reduce((sum, r) => sum + r.proteinGrams, 0) / plan.recipes.length)
-    : 52;
+    : 62;
 
   const totalCaloriesAvg = plan.recipes.length > 0
-    ? Math.round(plan.recipes.reduce((sum, r) => sum + (r.calories || 680), 0) / plan.recipes.length)
-    : 680;
+    ? Math.round(plan.recipes.reduce((sum, r) => sum + (r.calories || 720), 0) / plan.recipes.length)
+    : 720;
 
   const checkedItemsCount = plan.shoppingList.filter(i => i.checked).length;
 

@@ -290,7 +290,7 @@ export const GeneratorForm: React.FC<GeneratorFormProps> = ({
       {/* Micro status during generation */}
       {isLoading && (
         <div className="text-center p-3 text-xs text-zinc-400 animate-pulse">
-          ⚡ Calcul des portions (45g-65g prot), vérification des prix chez {supermarket} et cuisson sans aucun four...
+          ⚡ Calcul des portions (55g-75g prot), max 3 surgelés, prix chez {supermarket} et cuisson sans four...
         </div>
       )}
     </form>

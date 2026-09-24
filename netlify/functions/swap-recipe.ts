@@ -1,23 +1,29 @@
 import type { Handler } from '@netlify/functions';
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 const FALLBACK_MODELS = [
-  'gemini-flash-lite-latest',
   'gemini-3.5-flash-lite',
-  'gemini-3.7-flash',
   'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-lite-latest',
 ];
 
-const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 160g à 185g de protéines par jour).
+const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 170g à 195g de protéines par jour).
 Tes règles ABSOLUES :
-1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS : Chaque repas principal doit fournir STRICTEMENT entre 45g et 65g de protéines par portion (poulet, dinde, boeuf haché 5%, thon, oeufs, skyr, etc.).
+1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS : Chaque repas principal doit fournir STRICTEMENT entre 55g et 75g de protéines par portion (poulet, dinde, bœuf haché 5%, thon, colin, œufs, skyr, etc. moyenne ~60-65g).
 2. SATIÉTÉ MAXIMALE & ZÉRO SURPLUS CALORIQUE (VOLUME EATING) :
-   - Calories maîtrisées : STRICTEMENT entre 600 et 750 kcal par portion (aucun repas au-dessus de 750 kcal).
+   - Calories maîtrisées : STRICTEMENT entre 650 et 800 kcal par portion (aucun repas au-dessus de 800 kcal).
    - Grand volume alimentaire : part abondante de légumes riches en fibres (200g à 300g par personne : brocolis, courgettes, haricots, épinards...) et féculents à haute satiété (pommes de terre, riz complet, lentilles...).
    - Graisses de cuisson minimales (1 c. à café d'huile max par portion), liaisons légères (skyr, coulis de tomate sans sucre).
 3. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit).
-4. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
-5. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse, pas de mention Déjeuner/Dîner.
-6. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
+4. CONTRAINTE CONGÉLATEUR : MAXIMUM 3 ARTICLES SURGELÉS AU TOTAL dans toute la liste de courses (le congélateur est minuscule : max 3 produits surgelés par commande).
+5. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
+6. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse, pas de mention Déjeuner/Dîner.
+7. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -46,8 +52,9 @@ export const handler: Handler = async (event) => {
 Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
-- Riche en protéines : 45g à 65g de protéines par portion (musculation 84 kg).
-- Satiété maximale & zéro surplus calorique : calibrer STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal). Intégrer une belle portion de légumes rassasiants riches en fibres et eau (200g-300g) et féculents à haute satiété (pommes de terre, riz complet, lentilles...), sans excès de matières grasses.
+- Riche en protéines : 55g à 75g de protéines par portion (musculation 84 kg, moyenne ~60-65g).
+- Satiété maximale & zéro surplus calorique : calibrer STRICTEMENT entre 650 et 800 kcal par portion (jamais au-dessus de 800 kcal). Intégrer une belle portion de légumes rassasiants riches en fibres et eau (200g-300g) et féculents à haute satiété (pommes de terre, riz complet, lentilles...), sans excès de matières grasses.
+- CONTRAINTE CONGÉLATEUR : MAXIMUM 3 ARTICLES SURGELÉS AU TOTAL dans toute la liste de courses.
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
 ${params.excludedIngredients && params.excludedIngredients.length > 0 ? `- ALIMENTS STRICTEMENT INTERDITS (exclus par l'utilisateur) : ${params.excludedIngredients.join(', ')}` : ''}
@@ -64,8 +71,8 @@ Réponds avec ce schéma JSON exact :
     "title": "Nom du plat",
     "prepTimeMinutes": 15,
     "cookTimeMinutes": 15,
-    "proteinGrams": 52,
-    "calories": 680,
+    "proteinGrams": 62,
+    "calories": 720,
     "ingredients": [
       { "name": "Ingrédient", "amount": "Quantité" }
     ],
@@ -92,43 +99,52 @@ Réponds avec ce schéma JSON exact :
     let lastErr = '';
 
     for (const model of FALLBACK_MODELS) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.8,
-            },
-          }),
-        });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: 0.8,
+              },
+            }),
+          });
 
-        if (response.ok) {
-          const data = await response.json();
-          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            parsed = JSON.parse(rawText);
+          if (response.ok) {
+            const data = await response.json();
+            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (rawText) {
+              parsed = JSON.parse(rawText);
+              break;
+            }
+          } else {
+            lastErr = `Status ${response.status}`;
+            if (response.status === 503 || response.status === 429) {
+              const waitTime = (attempt + 1) * 900 + Math.floor(Math.random() * 500);
+              await sleep(waitTime);
+              continue;
+            }
+            if (response.status === 404) {
+              break;
+            }
             break;
           }
-        } else {
-          lastErr = `Status ${response.status}`;
-          if (response.status === 503 || response.status === 429 || response.status === 404) {
-            continue; // try next model
-          }
+        } catch (e: any) {
+          lastErr = e.message;
         }
-      } catch (e: any) {
-        lastErr = e.message;
       }
+      if (parsed) break;
     }
 
     if (!parsed) {
       return {
         statusCode: 503,
-        body: JSON.stringify({ error: `Tous les modèles Gemini sont momentanément saturés (${lastErr}). Réessaie dans quelques secondes.` }),
+        body: JSON.stringify({ error: `Tous les modèles Gemini sont momentanément saturés (${lastErr}). Patiente une dizaine de secondes puis réessaie.` }),
       };
     }
 
