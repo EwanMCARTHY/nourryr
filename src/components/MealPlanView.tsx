@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { MealPlan, Recipe, SavedMeal } from '../types';
+import type { MealPlan, Recipe, SavedMeal, ShoppingItem } from '../types';
 import { RecipeCard } from './RecipeCard';
 import { RecipeModal } from './RecipeModal';
 import { ShoppingListView } from './ShoppingListView';
@@ -12,6 +12,10 @@ interface MealPlanViewProps {
   onSwapRecipe: (recipe: Recipe) => Promise<void>;
   onToggleShoppingItem: (id: string) => void;
   onUpdateItemPrice: (itemId: string, newPrice: number) => void;
+  onExcludeShoppingItem?: (item: ShoppingItem) => Promise<void>;
+  excludingItemId?: string | null;
+  excludedIngredients?: string[];
+  onRestoreExcluded?: (ingredient: string) => Promise<void>;
   onResetShoppingChecks: () => void;
   onDeletePlan: () => void;
   swappingRecipeId: string | null;
@@ -24,6 +28,10 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
   onSwapRecipe,
   onToggleShoppingItem,
   onUpdateItemPrice,
+  onExcludeShoppingItem,
+  excludingItemId,
+  excludedIngredients = [],
+  onRestoreExcluded,
   onResetShoppingChecks,
   onDeletePlan,
   swappingRecipeId,
@@ -147,6 +155,10 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
           items={plan.shoppingList}
           onToggleItem={onToggleShoppingItem}
           onUpdatePrice={onUpdateItemPrice}
+          onExcludeItem={onExcludeShoppingItem}
+          excludingItemId={excludingItemId}
+          excludedIngredients={excludedIngredients}
+          onRestoreExcluded={onRestoreExcluded}
           supermarket={plan.supermarket}
           budget={plan.budget}
           estimatedCost={plan.estimatedTotalCost}

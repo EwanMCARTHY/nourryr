@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import type { GroceryCategory, ShoppingItem, Supermarket } from '../types';
-import { Check, Copy, CheckCheck, ShoppingBag, Store, Filter, RefreshCw, Pencil, X, Tag } from 'lucide-react';
+import { Check, Copy, CheckCheck, ShoppingBag, Store, Filter, RefreshCw, Pencil, X, Tag, Ban } from 'lucide-react';
 
 interface ShoppingListViewProps {
   items: ShoppingItem[];
   onToggleItem: (id: string) => void;
   onUpdatePrice?: (itemId: string, newPrice: number) => void;
+  onExcludeItem?: (item: ShoppingItem) => void;
+  excludingItemId?: string | null;
+  excludedIngredients?: string[];
+  onRestoreExcluded?: (ingredient: string) => void;
   supermarket: Supermarket;
   budget: number;
   estimatedCost: number;
@@ -32,6 +36,10 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
   items,
   onToggleItem,
   onUpdatePrice,
+  onExcludeItem,
+  excludingItemId,
+  excludedIngredients = [],
+  onRestoreExcluded,
   supermarket,
   budget,
   estimatedCost,
@@ -100,10 +108,23 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
           <div className="text-right">
             <span className="text-[11px] text-zinc-400 font-medium block">Estimation caddie</span>
             <div className="flex items-baseline gap-1 justify-end">
-              <span className="text-base font-extrabold text-emerald-400">~{estimatedCost}</span>
+              <span className={`text-base font-extrabold ${estimatedCost <= budget ? 'text-emerald-400' : 'text-amber-400'}`}>
+                ~{estimatedCost}€
+              </span>
               <span className="text-xs text-zinc-400">/ max {budget}€</span>
             </div>
           </div>
+        </div>
+
+        {/* Budget guarantee badge */}
+        <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px]">
+          <span className="text-zinc-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>Gamme premier prix ({supermarket === 'E.Leclerc' ? 'Eco+' : supermarket === 'Intermarché' ? 'Top Budget' : 'Pouce'})</span>
+          </span>
+          <span className={`font-semibold ${estimatedCost <= budget ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {estimatedCost <= budget ? '✓ Dans le budget' : 'Ajusté'}
+          </span>
         </div>
 
         {/* Progress bar */}
@@ -312,6 +333,28 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                           <Pencil className="w-2.5 h-2.5 opacity-60" />
                         </button>
                       )}
+
+                      {/* Exclude / Ban item button */}
+                      {onExcludeItem && (
+                        <button
+                          type="button"
+                          disabled={excludingItemId === item.id}
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (window.confirm(`Exclure "${item.name}" ?\nCet aliment sera remplacé dans la liste de courses et les repas concernés seront automatiquement adaptés sans dépasser le budget.`)) {
+                              onExcludeItem(item);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition-all disabled:opacity-50"
+                          title={`Exclure "${item.name}" (remplacer l'aliment et adapter les repas)`}
+                        >
+                          {excludingItemId === item.id ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                          ) : (
+                            <Ban className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -320,6 +363,40 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
           );
         })}
       </div>
+
+      {/* Excluded Ingredients List if any */}
+      {excludedIngredients && excludedIngredients.length > 0 && (
+        <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800/80 p-3.5 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-zinc-400 font-semibold flex items-center gap-1.5">
+              <Ban className="w-3.5 h-3.5 text-red-400" />
+              Aliments exclus ({excludedIngredients.length})
+            </span>
+            <span className="text-[11px] text-zinc-500">Bannis des repas & courses</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {excludedIngredients.map(ing => (
+              <span
+                key={ing}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800/90 border border-zinc-700/60 text-xs text-zinc-300"
+              >
+                <span>{ing}</span>
+                {onRestoreExcluded && (
+                  <button
+                    type="button"
+                    onClick={() => onRestoreExcluded(ing)}
+                    className="text-zinc-500 hover:text-red-300 transition-colors ml-0.5"
+                    title="Réintégrer cet aliment"
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

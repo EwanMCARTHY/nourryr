@@ -49,6 +49,7 @@ export interface MealPlan {
   estimatedTotalCost: number;
   recipes: Recipe[];
   shoppingList: ShoppingItem[];
+  excludedIngredients?: string[];
 }
 
 export interface SavedMeal {

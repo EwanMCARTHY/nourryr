@@ -4,6 +4,7 @@ import { getSupabaseClient } from './supabase';
 const LOCAL_PLAN_KEY = 'nourryr_active_plan';
 const LOCAL_FAVORITES_KEY = 'nourryr_saved_favorites';
 const LOCAL_PRICES_KEY = 'nourryr_custom_prices';
+const LOCAL_EXCLUDED_KEY = 'nourryr_excluded_ingredients';
 
 export async function fetchCurrentPlan(): Promise<MealPlan | null> {
   const supabase = getSupabaseClient();
@@ -156,3 +157,67 @@ export async function saveCustomPrice(itemName: string, price: number): Promise<
     }
   }
 }
+
+export async function fetchExcludedIngredients(): Promise<string[]> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('nourryr_plan')
+        .select('data')
+        .eq('id', 'shared_excluded_ingredients')
+        .maybeSingle();
+
+      if (!error && Array.isArray(data?.data)) {
+        localStorage.setItem(LOCAL_EXCLUDED_KEY, JSON.stringify(data.data));
+        return data.data as string[];
+      }
+    } catch (e) {
+      console.warn('Supabase fetch excluded ingredients error', e);
+    }
+  }
+
+  const local = localStorage.getItem(LOCAL_EXCLUDED_KEY);
+  return local ? JSON.parse(local) : [];
+}
+
+export async function addExcludedIngredient(ingredient: string): Promise<string[]> {
+  const current = await fetchExcludedIngredients();
+  const trimmed = ingredient.trim();
+  const normalized = trimmed.toLowerCase();
+  if (current.some(i => i.toLowerCase() === normalized)) return current;
+  const updated = [...current, trimmed];
+  localStorage.setItem(LOCAL_EXCLUDED_KEY, JSON.stringify(updated));
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase
+        .from('nourryr_plan')
+        .upsert({ id: 'shared_excluded_ingredients', data: updated, updated_at: new Date().toISOString() });
+    } catch (e) {
+      console.warn('Supabase save excluded ingredients error', e);
+    }
+  }
+  return updated;
+}
+
+export async function removeExcludedIngredient(ingredient: string): Promise<string[]> {
+  const current = await fetchExcludedIngredients();
+  const normalized = ingredient.trim().toLowerCase();
+  const updated = current.filter(i => i.toLowerCase() !== normalized);
+  localStorage.setItem(LOCAL_EXCLUDED_KEY, JSON.stringify(updated));
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase
+        .from('nourryr_plan')
+        .upsert({ id: 'shared_excluded_ingredients', data: updated, updated_at: new Date().toISOString() });
+    } catch (e) {
+      console.warn('Supabase remove excluded ingredient error', e);
+    }
+  }
+  return updated;
+}
+

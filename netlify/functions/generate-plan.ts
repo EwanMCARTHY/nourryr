@@ -38,10 +38,12 @@ export const handler: Handler = async (event) => {
     const params = JSON.parse(event.body || '{}');
 
     const customPrices = params.customPrices || {};
+    const premierPrixBrand = params.supermarket === 'E.Leclerc' ? 'Eco+ (ou Marque Repère premier prix)' : params.supermarket === 'Intermarché' ? 'Top Budget (ou Monique Ranou premier prix)' : 'Pouce (ou Marque Auchan premier prix)';
 
     const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
 Supermarché : ${params.supermarket}
-Budget total max : ${params.budget} €
+Budget total max : ${params.budget} € (LIMITE STRICTE ET ABSOLUE : l'estimation totale du caddie ne doit JAMAIS dépasser ce montant).
+${params.excludedIngredients && params.excludedIngredients.length > 0 ? `ALIMENTS STRICTEMENT EXCLUS / DÉTESTÉS PAR L'UTILISATEUR (NE JAMAIS LES UTILISER DANS AUCUNE RECETTE NI DANS LA LISTE DE COURSES) : ${params.excludedIngredients.join(', ')}` : ''}
 Objectifs nutritionnels & Satiété :
 - 45g à 65g de protéines réelles par portion (athlète 84 kg).
 - Satiété maximale & zéro surplus calorique : chaque repas doit apporter STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal pour éliminer tout risque de surplus).
@@ -52,8 +54,9 @@ Pas de texte de description pour les repas.
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map((r: any) => r.title).join(', ')}` : ''}
 ${Object.keys(customPrices).length > 0 ? `PRIX CONNUS ET VÉRIFIÉS EN MAGASIN PAR L'UTILISATEUR (utilise ces prix en priorité) :\n${JSON.stringify(customPrices, null, 2)}` : ''}
 
-Exigences liste de courses :
-Détaille article par article sans regrouper de manière vague. Précise le nom, la marque de distributeur (${params.supermarket}), le format/packaging exact et le prix unitaire réaliste.
+Exigences liste de courses & Respect du budget :
+- Détaille article par article sans regrouper de manière vague. Précise le nom, la marque de distributeur (${params.supermarket}), le format/packaging exact et le prix unitaire réaliste.
+- Utilise en priorité les gammes premiers prix (${premierPrixBrand}) pour les féculents, conserves/surgelés, œufs et viandes afin de garantir que l'estimation totale soit STRICTEMENT <= ${params.budget} €.
 
 Réponds avec ce schéma JSON exact :
 {
@@ -180,6 +183,7 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
         equipmentUsed: r.equipmentUsed || ['Poêle', 'Plaques'],
       })),
       shoppingList,
+      excludedIngredients: params.excludedIngredients || [],
     };
 
     return {

@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { MealPlan, Recipe, SavedMeal, Supermarket } from './types';
+import type { MealPlan, Recipe, SavedMeal, Supermarket, ShoppingItem } from './types';
 import { Header } from './components/Header';
 import { GeneratorForm } from './components/GeneratorForm';
 import { MealPlanView } from './components/MealPlanView';
 import { SavedMealsDrawer } from './components/SavedMealsDrawer';
 import { RecipeModal } from './components/RecipeModal';
 import { SettingsModal } from './components/SettingsModal';
-import { generateMealPlan, swapRecipe } from './lib/gemini';
+import { generateMealPlan, swapRecipe, excludeShoppingItem } from './lib/gemini';
 import {
   fetchCurrentPlan,
   saveCurrentPlan,
@@ -15,18 +15,24 @@ import {
   removeSavedMeal,
   fetchCustomPrices,
   saveCustomPrice,
+  fetchExcludedIngredients,
+  addExcludedIngredient,
+  removeExcludedIngredient,
 } from './lib/storage';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export function App() {
   const [activePlan, setActivePlan] = useState<MealPlan | null>(null);
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
+  const [excludedIngredients, setExcludedIngredients] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [swappingRecipeId, setSwappingRecipeId] = useState<string | null>(null);
+  const [excludingItemId, setExcludingItemId] = useState<string | null>(null);
   const [isSavedDrawerOpen, setIsSavedDrawerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [inspectedSavedRecipe, setInspectedSavedRecipe] = useState<Recipe | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
 
   // Check API key presence
@@ -55,12 +61,14 @@ export function App() {
   // Load initial data
   const loadData = useCallback(async () => {
     try {
-      const [plan, favorites] = await Promise.all([
+      const [plan, favorites, excluded] = await Promise.all([
         fetchCurrentPlan(),
         fetchSavedMeals(),
+        fetchExcludedIngredients(),
       ]);
       if (plan) setActivePlan(plan);
       if (favorites) setSavedMeals(favorites);
+      if (excluded) setExcludedIngredients(excluded);
     } catch (e) {
       console.error('Error loading data', e);
     }
@@ -97,6 +105,7 @@ export function App() {
       const plan = await generateMealPlan({
         ...params,
         savedRecipes: savedMeals,
+        excludedIngredients,
         customPrices,
         apiKey,
       });
@@ -154,6 +163,7 @@ export function App() {
         numberOfPeople: activePlan.numberOfPeople,
         supermarket: activePlan.supermarket,
         budget: activePlan.budget,
+        excludedIngredients: activePlan.excludedIngredients || excludedIngredients,
         customPrices,
         apiKey,
       });
@@ -176,6 +186,69 @@ export function App() {
       setErrorMessage(err.message || 'Impossible de remplacer la recette.');
     } finally {
       setSwappingRecipeId(null);
+    }
+  };
+
+  // Exclude an item from the shopping list and adapt affected recipes
+  const handleExcludeShoppingItem = async (item: ShoppingItem) => {
+    if (!activePlan) return;
+    setExcludingItemId(item.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const apiKey = localStorage.getItem('nourryr_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
+      const customPrices = await fetchCustomPrices();
+
+      const result = await excludeShoppingItem({
+        excludedItem: item,
+        currentMealPlan: activePlan,
+        customPrices,
+        apiKey,
+      });
+
+      const updatedExcluded = Array.from(new Set([...excludedIngredients, item.name]));
+      setExcludedIngredients(updatedExcluded);
+      await addExcludedIngredient(item.name);
+
+      const updatedPlan: MealPlan = {
+        ...activePlan,
+        recipes: result.updatedRecipes,
+        shoppingList: result.updatedShoppingList,
+        estimatedTotalCost: result.estimatedTotalCost,
+        excludedIngredients: updatedExcluded,
+      };
+
+      setActivePlan(updatedPlan);
+      await saveCurrentPlan(updatedPlan);
+      setSuccessMessage(result.replacementSummary || `"${item.name}" exclu et remplacé.`);
+    } catch (err: any) {
+      console.error('Exclude error', err);
+      setErrorMessage(err.message || "Impossible d'exclure cet aliment.");
+    } finally {
+      setExcludingItemId(null);
+    }
+  };
+
+  // Restore a previously excluded ingredient
+  const handleRestoreExcluded = async (ingredient: string) => {
+    try {
+      await removeExcludedIngredient(ingredient);
+      const updatedExcluded = excludedIngredients.filter(i => i.toLowerCase() !== ingredient.toLowerCase());
+      setExcludedIngredients(updatedExcluded);
+
+      if (activePlan) {
+        const updatedPlan: MealPlan = {
+          ...activePlan,
+          excludedIngredients: updatedExcluded,
+        };
+        setActivePlan(updatedPlan);
+        await saveCurrentPlan(updatedPlan);
+      }
+      setSuccessMessage(`"${ingredient}" a été retiré des aliments exclus.`);
+    } catch (err: any) {
+      console.error('Restore excluded error', err);
+      setErrorMessage("Erreur lors de la réactivation de l'ingrédient.");
     }
   };
 
@@ -310,6 +383,22 @@ export function App() {
           </div>
         )}
 
+        {/* Success Alert if any */}
+        {successMessage && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-300 flex items-start gap-2.5 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold">{successMessage}</p>
+            </div>
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="text-emerald-400 hover:text-emerald-200 font-bold px-1"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* View Switch: Generator Form OR Active Meal Plan */}
         {!activePlan ? (
           <GeneratorForm
@@ -327,6 +416,10 @@ export function App() {
             onSwapRecipe={handleSwapRecipe}
             onToggleShoppingItem={handleToggleShoppingItem}
             onUpdateItemPrice={handleUpdateItemPrice}
+            onExcludeShoppingItem={handleExcludeShoppingItem}
+            excludingItemId={excludingItemId}
+            excludedIngredients={excludedIngredients}
+            onRestoreExcluded={handleRestoreExcluded}
             onResetShoppingChecks={handleResetShoppingChecks}
             onDeletePlan={handleResetPlan}
             swappingRecipeId={swappingRecipeId}

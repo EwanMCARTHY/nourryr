@@ -40,6 +40,7 @@ export const handler: Handler = async (event) => {
       .map((r: any) => r.title);
 
     const customPrices = params.customPrices || {};
+    const premierPrixBrand = params.supermarket === 'E.Leclerc' ? 'Eco+ (ou Marque Repère premier prix)' : params.supermarket === 'Intermarché' ? 'Top Budget (ou Monique Ranou premier prix)' : 'Pouce (ou Marque Auchan premier prix)';
 
     const prompt = `L'utilisateur souhaite remplacer le repas "${params.currentRecipe.title}" (Repas n°${params.currentRecipe.mealIndex || 1}).
 Critères du nouveau plat :
@@ -49,11 +50,12 @@ Critères du nouveau plat :
 - Satiété maximale & zéro surplus calorique : calibrer STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal). Intégrer une belle portion de légumes rassasiants riches en fibres et eau (200g-300g) et féculents à haute satiété (pommes de terre, riz complet, lentilles...), sans excès de matières grasses.
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
+${params.excludedIngredients && params.excludedIngredients.length > 0 ? `- ALIMENTS STRICTEMENT INTERDITS (exclus par l'utilisateur) : ${params.excludedIngredients.join(', ')}` : ''}
 
-ADAPTATION DE LA LISTE DE COURSES GRANULAIRE :
+ADAPTATION DE LA LISTE DE COURSES GRANULAIRE & RESPECT DU BUDGET :
 - Ajuste la liste de courses article par article pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
 - Détaille article par article avec marque distributeur (${params.supermarket}), conditionnement et prix unitaire réaliste.
-- Essaie en priorité de réutiliser des ingrédients déjà achetés dans le reste du panier pour respecter le budget max de ${params.budget} €.
+- RÈGLE ABSOLUE BUDGET : Utilise si besoin les produits premiers prix (${premierPrixBrand}) et réutilise les ingrédients déjà achetés dans le reste du panier afin que l'estimation totale reste STRICTEMENT <= ${params.budget} €.
 ${Object.keys(customPrices).length > 0 ? `PRIX CONNUS DE L'UTILISATEUR : ${JSON.stringify(customPrices)}` : ''}
 
 Réponds avec ce schéma JSON exact :

@@ -8,6 +8,7 @@ export interface GeneratePlanParams {
   budget: number;
   savedRecipes?: SavedMeal[];
   customPrices?: Record<string, number>;
+  excludedIngredients?: string[];
   apiKey?: string;
 }
 
@@ -19,6 +20,7 @@ export interface SwapRecipeParams {
   supermarket: Supermarket;
   budget: number;
   customPrices?: Record<string, number>;
+  excludedIngredients?: string[];
   apiKey?: string;
 }
 
@@ -26,6 +28,20 @@ export interface SwapRecipeResult {
   newRecipe: Recipe;
   updatedShoppingList: ShoppingItem[];
   estimatedTotalCost: number;
+}
+
+export interface ExcludeShoppingItemParams {
+  excludedItem: ShoppingItem;
+  currentMealPlan: MealPlan;
+  customPrices?: Record<string, number>;
+  apiKey?: string;
+}
+
+export interface ExcludeShoppingItemResult {
+  updatedRecipes: Recipe[];
+  updatedShoppingList: ShoppingItem[];
+  estimatedTotalCost: number;
+  replacementSummary: string;
 }
 
 const FALLBACK_MODELS = [
@@ -45,11 +61,17 @@ Tes règles ABSOLUES :
    - Féculents à fort indice de satiété : pommes de terre (aliment n°1 de la satiété), riz basmati/complet, lentilles, pois chiches, pâtes complètes, flocons d'avoine.
    - Limitation stricte des graisses cachées : 1 c. à café d'huile max par portion pour la cuisson. Lier les sauces avec du skyr, fromage blanc 0% ou coulis de tomate sans sucre. Assaisonner avec épices, herbes, ail, oignon, citron.
 3. ÉQUIPEMENT DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit : aucun gratin, quiche, rôti ou plat au four).
-4. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
+4. RESPECT STRICT DU BUDGET & PRODUITS PREMIERS PRIX :
+   - Le budget total max indiqué est une LIMITE ABSOLUE INFRANCHISSABLE. Le coût total estimé ne doit JAMAIS le dépasser (estimatedTotalCost <= budget).
+   - Pour garantir le respect du budget sans rogner sur les protéines, utilise en priorité les gammes premiers prix / hard discount de l'enseigne :
+     * E.Leclerc : marque Eco+ (ou Marque Repère premier prix).
+     * Intermarché : marque Top Budget (ou Monique Ranou / Pâturages premier prix).
+     * Auchan : marque Pouce (ou Marque Auchan premier prix).
+   - Optimise les ingrédients de base partagés entre plusieurs repas (ex: même sac de riz, filet de pommes de terre, boîte de 10/12 œufs, barquette familiale de volaille) pour faire baisser le coût par repas.
 5. LISTE DE COURSES GRANULAIRE ET ULTRA DÉTAILLÉE :
    - Évite les regroupements vagues : détaille élément par élément pour qu'on sache exactement quoi prendre en rayon.
-   - Mentionne la marque typique du magasin (ex: Marque Repère/Eco+ chez E.Leclerc, Monique Ranou/Pâturages chez Intermarché, Marque Auchan/Pouce chez Auchan).
-   - Prrecise le conditionnement précis (ex: "Barquette 4x100g", "Bocal 400g", "Paquet 1kg", "Boîte de 10 œufs").
+   - Mentionne la marque du magasin (ex: Eco+ / Marque Repère chez E.Leclerc, Top Budget / Monique Ranou chez Intermarché, Pouce / Marque Auchan chez Auchan).
+   - Précise le conditionnement précis (ex: "Barquette 4x100g", "Bocal 400g", "Paquet 1kg", "Boîte de 10 œufs").
    - Donne un prix unitaire réaliste en euros pour ce produit précis.
 6. SOBRIÉTÉ : Pas de description verbeuse de repas, pas de mention Déjeuner/Dîner. Va droit à l'essentiel : titre clair, ingrédients, étapes courtes.
 7. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
@@ -115,9 +137,12 @@ export async function generateMealPlan(params: GeneratePlanParams): Promise<Meal
     throw new Error("Clé API Gemini manquante. Renseigne ta clé API dans les paramètres ⚙️.");
   }
 
+  const premierPrixBrand = params.supermarket === 'E.Leclerc' ? 'Eco+ (ou Marque Repère premier prix)' : params.supermarket === 'Intermarché' ? 'Top Budget (ou Monique Ranou premier prix)' : 'Pouce (ou Marque Auchan premier prix)';
+
   const prompt = `Génère exactement ${params.totalMeals} repas protéinés distincts pour ${params.numberOfPeople} personnes sur ${params.numberOfDays} jours.
 Supermarché : ${params.supermarket}
-Budget total max : ${params.budget} €
+Budget total max : ${params.budget} € (LIMITE STRICTE ET ABSOLUE : l'estimation totale du caddie ne doit JAMAIS dépasser ce montant).
+${params.excludedIngredients && params.excludedIngredients.length > 0 ? `ALIMENTS STRICTEMENT EXCLUS / DÉTESTÉS PAR L'UTILISATEUR (NE JAMAIS LES UTILISER DANS AUCUNE RECETTE NI DANS LA LISTE DE COURSES) : ${params.excludedIngredients.join(', ')}` : ''}
 Objectifs nutritionnels & Satiété :
 - 45g à 65g de protéines réelles par portion (athlète 84 kg).
 - Satiété maximale & zéro surplus calorique : chaque repas doit apporter STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal pour éliminer tout risque de surplus).
@@ -128,8 +153,9 @@ Pas de texte de description pour les repas.
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map(r => r.title).join(', ')}` : ''}
 ${params.customPrices && Object.keys(params.customPrices).length > 0 ? `PRIX CONNUS ET VÉRIFIÉS EN MAGASIN PAR L'UTILISATEUR (utilise ces prix en priorité) :\n${JSON.stringify(params.customPrices, null, 2)}` : ''}
 
-Exigences liste de courses :
-Détaille article par article sans regrouper de manière vague. Précise le nom, la marque de distributeur (${params.supermarket}), le format/packaging exact et le prix unitaire réaliste.
+Exigences liste de courses & Respect du budget :
+- Détaille article par article sans regrouper de manière vague. Précise le nom, la marque de distributeur (${params.supermarket}), le format/packaging exact et le prix unitaire réaliste.
+- Utilise en priorité les gammes premiers prix (${premierPrixBrand}) pour les féculents, conserves/surgelés, œufs et viandes afin de garantir que l'estimation totale soit STRICTEMENT <= ${params.budget} €.
 
 Réponds avec ce schéma JSON exact :
 {
@@ -217,6 +243,7 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
       equipmentUsed: r.equipmentUsed || ['Poêle', 'Plaques'],
     })),
     shoppingList,
+    excludedIngredients: params.excludedIngredients || [],
   };
 
   return mealPlan;
@@ -245,6 +272,8 @@ export async function swapRecipe(params: SwapRecipeParams): Promise<SwapRecipeRe
     .filter(r => r.id !== params.currentRecipe.id)
     .map(r => r.title);
 
+  const premierPrixBrand = params.supermarket === 'E.Leclerc' ? 'Eco+ (ou Marque Repère premier prix)' : params.supermarket === 'Intermarché' ? 'Top Budget (ou Monique Ranou premier prix)' : 'Pouce (ou Marque Auchan premier prix)';
+
   const prompt = `L'utilisateur souhaite remplacer le repas "${params.currentRecipe.title}" (Repas n°${params.currentRecipe.mealIndex || 1}).
 Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
@@ -253,11 +282,12 @@ Critères du nouveau plat :
 - Satiété maximale & zéro surplus calorique : calibrer STRICTEMENT entre 600 et 750 kcal par portion (jamais au-dessus de 750 kcal). Intégrer une belle portion de légumes rassasiants riches en fibres et eau (200g-300g) et féculents à haute satiété (pommes de terre, riz complet, lentilles...), sans excès de matières grasses.
 - AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
 - Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
+${params.excludedIngredients && params.excludedIngredients.length > 0 ? `- ALIMENTS STRICTEMENT INTERDITS (exclus par l'utilisateur) : ${params.excludedIngredients.join(', ')}` : ''}
 
-ADAPTATION DE LA LISTE DE COURSES GRANULAIRE :
+ADAPTATION DE LA LISTE DE COURSES GRANULAIRE & RESPECT DU BUDGET :
 - Ajuste la liste de courses article par article pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
 - Détaille article par article avec marque distributeur (${params.supermarket}), conditionnement et prix unitaire réaliste.
-- Essaie en priorité de réutiliser des ingrédients déjà achetés dans le reste du panier pour respecter le budget max de ${params.budget} €.
+- RÈGLE ABSOLUE BUDGET : Utilise si besoin les produits premiers prix (${premierPrixBrand}) et réutilise les ingrédients déjà achetés dans le reste du panier afin que l'estimation totale reste STRICTEMENT <= ${params.budget} €.
 ${params.customPrices && Object.keys(params.customPrices).length > 0 ? `PRIX CONNUS DE L'UTILISATEUR : ${JSON.stringify(params.customPrices)}` : ''}
 
 Réponds avec ce schéma JSON exact :
@@ -340,3 +370,139 @@ Réponds avec ce schéma JSON exact :
     estimatedTotalCost: Number(totalCost.toFixed(2)) || parsed.estimatedTotalCost || params.budget,
   };
 }
+
+export async function excludeShoppingItem(params: ExcludeShoppingItemParams): Promise<ExcludeShoppingItemResult> {
+  const apiKey = params.apiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
+
+  if (!apiKey) {
+    try {
+      const res = await fetch('/.netlify/functions/exclude-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fall through
+    }
+    throw new Error("Clé API Gemini requise pour exclure un aliment.");
+  }
+
+  const { excludedItem, currentMealPlan } = params;
+  const premierPrixBrand = currentMealPlan.supermarket === 'E.Leclerc'
+    ? 'Eco+ (ou Marque Repère premier prix)'
+    : currentMealPlan.supermarket === 'Intermarché'
+      ? 'Top Budget (ou Monique Ranou premier prix)'
+      : 'Pouce (ou Marque Auchan premier prix)';
+
+  const prompt = `L'utilisateur souhaite STRICTEMENT EXCLURE l'aliment "${excludedItem.name}" (${excludedItem.category}) de sa liste de courses et de tous ses repas (aliment non apprécié / intolérance).
+
+PLAN DE REPAS ACTUEL :
+- Enseigne : ${currentMealPlan.supermarket}
+- Budget max strict : ${currentMealPlan.budget} € (LIMITE ABSOLUE : l'estimation totale du caddie NE DOIT EN AUCUN CAS DÉPASSER ce montant)
+- Nombre de personnes : ${currentMealPlan.numberOfPeople}
+- Recettes actuelles (${currentMealPlan.recipes.length} repas) :
+${JSON.stringify(currentMealPlan.recipes.map(r => ({
+  id: r.id,
+  mealIndex: r.mealIndex,
+  title: r.title,
+  proteinGrams: r.proteinGrams,
+  calories: r.calories,
+  ingredients: r.ingredients,
+  instructions: r.instructions,
+  equipmentUsed: r.equipmentUsed,
+})), null, 2)}
+
+LISTE DE COURSES ACTUELLE :
+${JSON.stringify(currentMealPlan.shoppingList.map(s => ({
+  name: s.name,
+  quantity: s.quantity,
+  brand: s.brand,
+  unitDetails: s.unitDetails,
+  category: s.category,
+  estimatedPrice: s.estimatedPrice,
+})), null, 2)}
+
+OBJECTIFS OBLIGATOIRES :
+1. SUPPRIMER COMPLÈTEMENT "${excludedItem.name}" du caddie et de TOUTES les recettes qui en contenaient.
+2. TROUVER UN REMPLAÇANT ADAPTÉ : Choisir un produit équivalent de la même famille nutritionnelle (ex: si légume exclu, remplacer par un autre légume volumineux comme courgettes, haricots verts, carottes ; si viande/poisson, remplacer par escalopes de poulet/dinde, bœuf 5%, œufs, thon ; si féculent, remplacer par pommes de terre, riz, lentilles).
+3. ADAPTER LES RECETTES IMPACTÉES : Modifier les recettes concernées pour intégrer ce substitut, ajuster le titre si nécessaire, la liste des ingrédients et les étapes de préparation. Les recettes qui ne contenaient pas "${excludedItem.name}" DOIVENT RESTER STRICTEMENT IDENTIQUES.
+4. METTRE À JOUR LA LISTE DE COURSES :
+   - Retirer "${excludedItem.name}".
+   - Ajouter le produit de remplacement en précisant la marque (${premierPrixBrand}), le conditionnement exact et le prix unitaire.
+   - GARANTIR LE RESPECT DU BUDGET : Utiliser les produits premiers prix (${premierPrixBrand}) pour s'assurer que le coût total estimé reste STRICTEMENT inférieur ou égal à ${currentMealPlan.budget} €.
+${params.customPrices && Object.keys(params.customPrices).length > 0 ? `PRIX CONNUS DE L'UTILISATEUR : ${JSON.stringify(params.customPrices)}` : ''}
+
+Réponds avec ce schéma JSON exact :
+{
+  "replacementSummary": "Explication claire en 1 phrase (ex: 'Brocoli remplacé par des courgettes dans le Repas 2 et le Repas 4')",
+  "recipes": [
+    ... liste complète des ${currentMealPlan.recipes.length} recettes (les recettes non impactées conservent leur id et leur contenu exact, les recettes impactées sont adaptées avec 45-65g prot, 600-750 kcal, sans four)
+  ],
+  "updatedShoppingList": [
+    {
+      "name": "Nom ingrédient précis",
+      "quantity": "Quantité globale",
+      "brand": "Marque",
+      "unitDetails": "Format packaging",
+      "category": "Boucherie & Poissonnerie",
+      "estimatedPrice": 4.50
+    }
+  ],
+  "estimatedTotalCost": nombre (STRICTEMENT <= ${currentMealPlan.budget})
+}`;
+
+  const parsed = await callGeminiWithFallback(apiKey, prompt, SYSTEM_INSTRUCTION, 0.7);
+
+  const customMap = params.customPrices || {};
+  const checkedMap = new Map<string, boolean>();
+  currentMealPlan.shoppingList.forEach(item => {
+    checkedMap.set(item.name.toLowerCase().trim(), item.checked);
+  });
+
+  const updatedShoppingList: ShoppingItem[] = (parsed.updatedShoppingList || []).map((s: any, idx: number) => {
+    const normName = s.name?.toLowerCase()?.trim() || '';
+    let finalPrice = Number(s.estimatedPrice) || 3.0;
+    let isUserPrice = false;
+
+    for (const [knownName, knownPrice] of Object.entries(customMap)) {
+      if (normName.includes(knownName) || knownName.includes(normName)) {
+        finalPrice = knownPrice;
+        isUserPrice = true;
+        break;
+      }
+    }
+
+    const isChecked = checkedMap.get(normName) || false;
+    return {
+      id: 'shop-' + (idx + 1) + '-' + Date.now(),
+      name: s.name,
+      quantity: s.quantity,
+      brand: s.brand,
+      unitDetails: s.unitDetails,
+      category: s.category || 'Épicerie & Féculents',
+      checked: isChecked,
+      estimatedPrice: Number(finalPrice.toFixed(2)),
+      isUserPrice,
+    };
+  });
+
+  const totalCost = updatedShoppingList.reduce((sum, item) => sum + item.estimatedPrice, 0);
+
+  const updatedRecipes: Recipe[] = (parsed.recipes || []).map((r: any, idx: number) => ({
+    ...r,
+    id: r.id || currentMealPlan.recipes[idx]?.id || 'recipe-' + (idx + 1) + '-' + Date.now(),
+    mealIndex: r.mealIndex || idx + 1,
+    equipmentUsed: r.equipmentUsed || ['Poêle', 'Plaques'],
+  }));
+
+  return {
+    updatedRecipes: updatedRecipes.length > 0 ? updatedRecipes : currentMealPlan.recipes,
+    updatedShoppingList: updatedShoppingList.length > 0 ? updatedShoppingList : currentMealPlan.shoppingList,
+    estimatedTotalCost: Number(totalCost.toFixed(2)) || parsed.estimatedTotalCost || currentMealPlan.budget,
+    replacementSummary: parsed.replacementSummary || `"${excludedItem.name}" a été remplacé avec succès.`,
+  };
+}
+
