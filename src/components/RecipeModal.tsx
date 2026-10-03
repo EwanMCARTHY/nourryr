@@ -37,11 +37,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       >
         {/* Header bar */}
         <div className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-zinc-950/95 backdrop-blur-md z-10">
-          <div className="flex items-center gap-2">
             <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              Repas {recipe.mealIndex || ''}
+              {recipe.mealIndex ? `Repas ${recipe.mealIndex}` : 'Recette favorite'}
             </span>
-          </div>
 
           <button
             onClick={onClose}
@@ -195,15 +193,17 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             )}
           </button>
 
-          <button
-            type="button"
-            disabled={isSwapping}
-            onClick={() => onSwap(recipe)}
-            className="py-3 px-4 rounded-xl bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 active:scale-95 transition-all text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40"
-          >
-            <RefreshCw className={`w-4 h-4 ${isSwapping ? 'animate-spin text-emerald-400' : ''}`} />
-            <span>{isSwapping ? 'Changement...' : 'Changer'}</span>
-          </button>
+          {recipe.mealIndex !== undefined && (
+            <button
+              type="button"
+              disabled={isSwapping}
+              onClick={() => onSwap(recipe)}
+              className="py-3 px-4 rounded-xl bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800 active:scale-95 transition-all text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSwapping ? 'animate-spin text-emerald-400' : ''}`} />
+              <span>{isSwapping ? 'Changement...' : 'Changer'}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

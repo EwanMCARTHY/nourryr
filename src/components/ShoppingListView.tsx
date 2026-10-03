@@ -16,6 +16,8 @@ interface ShoppingListViewProps {
   onResetAllChecks: () => void;
 }
 
+import { normalizeCategory } from '../lib/gemini';
+
 const CATEGORY_ORDER: GroceryCategory[] = [
   'Boucherie & Poissonnerie',
   'Crémerie & Œufs',
@@ -70,11 +72,23 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
     return text.includes('surgel') || text.includes('congel');
   }).length;
 
-  // Group items by category
+  // Group items by category with canonical normalization
   const grouped = CATEGORY_ORDER.reduce((acc, cat) => {
-    acc[cat] = items.filter(item => item.category === cat);
+    acc[cat] = items.filter(item => {
+      const canonical = CATEGORY_ORDER.includes(item.category as GroceryCategory)
+        ? (item.category as GroceryCategory)
+        : normalizeCategory(item.category);
+      return canonical === cat;
+    });
     return acc;
   }, {} as Record<GroceryCategory, ShoppingItem[]>);
+
+  // Guarantee that unmapped items are never dropped from the UI
+  const mappedIds = new Set(Object.values(grouped).flat().map(i => i.id));
+  const unmapped = items.filter(i => !mappedIds.has(i.id));
+  if (unmapped.length > 0) {
+    grouped['Condiments & Autres'] = [...grouped['Condiments & Autres'], ...unmapped];
+  }
 
   const copyToClipboard = () => {
     let text = `🛒 Liste de courses Nourryr (${supermarket}) - Budget ~${estimatedCost}€\n\n`;
@@ -261,7 +275,7 @@ export const ShoppingListView: React.FC<ShoppingListViewProps> = ({
                             {item.name}
                           </span>
                           {item.isUserPrice && (
-                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded">
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
                               Prix vérifié
                             </span>
                           )}
