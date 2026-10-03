@@ -16,7 +16,7 @@ const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et cuisinier pr
 
 Tes règles FONDAMENTALES :
 
-1. RÉALITÉ DU SUPERMARCHÉ & PACKS ENTIERS (ZÉRO GASPILLAGE) :
+1. RÉALITÉ DU SUPERMARCHÉ & AUCUN ARTICLE NON OUVERT (ZÉRO GASPILLAGE INUTILE) :
    - Chaque ligne de la liste de courses DOIT être un vrai conditionnement de magasin (jamais de quantité au prorata).
    - Utilise les vrais prix constatés en France en marques premier prix (Eco+ chez E.Leclerc, Top Budget chez Intermarché, Pouce chez Auchan) :
      * Boîte de 10-12 œufs : ~2.50€ - 2.80€ (ou plateau de 30 œufs : ~5.50€).
@@ -30,16 +30,17 @@ Tes règles FONDAMENTALES :
      * Bocal de légumes (haricots verts, petits pois) 400g égoutté : ~1.00€ - 1.30€.
      * Boîte de légumineuses (haricots rouges, pois chiches, lentilles) : ~0.80€ - 1.10€.
      * Barquette de blanc de volaille 500g : ~4.80€ - 5.50€.
-     * Pack de 4 steaks hachés 15% : ~3.90€ - 4.40€.
-   - ZÉRO RESTE : Les ingrédients achetés doivent être ENTIÈREMENT consommés sur la semaine.
-     * Choisis 2 féculents principaux seulement (RIZ et PÂTES en priorité absolue).
-     * Oignons dans TOUTES les sauces/poêlées pour donner du goût.
-     * Tous les œufs et toutes les boîtes de thon achetés doivent être utilisés dans les recettes. Rien ne doit traîner dans le frigo à la fin de la semaine.
+     * Boîte de steaks hachés 15% surgelés (boîte de 8 ou 10) : ~6.50€ - 7.50€ (économique et longue conservation).
+   - RÈGLE ABSOLUE DU "ZÉRO PRODUIT NON OUVERT" :
+     * TOUT article présent dans la liste de courses DOIT OBLIGATOIREMENT être utilisé et cuisiné dans AU MOINS UNE recette de la semaine. Interdiction formelle de mettre un article dans le panier (ex: carottes, conserve de lentilles) s'il n'est jamais ouvert ni cuisiné dans le menu !
+     * Gestion du stock et conservation :
+       - Produits longue conservation / surgelés (paquet de 10 steaks surgelés, sac de 1kg de riz/pâtes, boîte de cubes de bouillon, épices) : aucun problème s'il en reste à la fin de la semaine car ils ne périment pas et serviront plus tard. L'essentiel est qu'ils soient entamés et utilisés dans les recettes.
+       - Produits frais périssables (viande fraîche, légumes frais entamés) : à consommer dans la semaine pour éviter le pourrissement.
 
 2. PROTÉINES ÉCONOMIQUES : PRIORITÉ MAXIMALE AUX ŒUFS ET AU THON :
    - Les ŒUFS (omelettes garnies, œufs brouillés, œufs au plat sur riz, riz sauté aux œufs) et le THON au naturel (pâtes au thon sauce tomate, riz sauté thon-oignons, poêlée thon-légumes) sont les protéines PRINCIPALES du menu.
-   - Les viandes fraîches (poulet, steak haché) sont des "bonus" limités à 1 ou 2 repas max dans la semaine pour garder le budget ultra serré.
-   - Apports visés : 45g à 60g de protéines par repas (portion généreuse d'œufs : 3 à 4 œufs par personne, ou 1 boîte entière de thon par personne, ou viande + féculents).
+   - Les viandes (poulet, steaks hachés surgelés ou frais) sont des "bonus" limités à 1 ou 2 repas max dans la semaine pour garder le budget ultra serré.
+   - Apports visés : 45g à 60g de protéines par repas (portion généreuse d'œufs : 3 à 4 œufs par personne, ou 1 boîte entière de thon par personne, ou steak/viande + féculents).
 
 3. PLATS SIMPLES, RAPIDES & ULTRA SAVOUREUX (SANS CRÈME LOURDE) :
    - Pas de recettes compliquées, 2 à 3 étapes de préparation maximum (15-20 min).
@@ -88,9 +89,11 @@ Objectifs nutritionnels, Saveur & Budget Réel :
   * Utiliser des CUBES DE BOUILLON émiettés dans l'eau de cuisson du riz/pâtes ou dans les poêlées (exhausteur de goût puissant et économique).
   * Coulis de tomate cuisiné, pointe de moutarde, filet de sauce soja, épices simples (paprika, curry doux, herbes de Provence, sel, poivre).
   * Pas de crème fraîche lourde, pas de fromage blanc cuit à la poêle (le fromage blanc caille).
-- CONDITIONNEMENTS RÉELS (PACKS ENTIERS) & ZÉRO GASPILLAGE :
+- CONDITIONNEMENTS RÉELS (PACKS ENTIERS) & RÈGLE ABSOLUE DU ZÉRO ARTICLE NON OUVERT :
   * Chaque article de la shoppingList DOIT être un paquet/pack entier réel de supermarché (${premierPrixBrand}).
-  * ZÉRO RESTE : Les quantités achetées doivent être 100% consommées dans les repas de la semaine (ex: une boîte de 12 œufs est entièrement répartie sur 2 repas de 6 œufs, un paquet de riz est vidé sur plusieurs repas, etc.). Rien ne reste dans le frigo le dimanche.
+  * ZÉRO ARTICLE ACHETÉ POUR RIEN : TOUT article présent dans la shoppingList DOIT OBLIGATOIREMENT figurer dans la liste des ingrédients d'au moins une recette et être cuisiné dans le menu. Interdiction formelle de faire acheter un produit (ex: carottes, conserve de lentilles) s'il n'est jamais ouvert ni utilisé dans une recette !
+  * Les produits longue conservation ou surgelés (paquet de 10 steaks surgelés, riz, pâtes, bouillon cube, épices) peuvent bien sûr avoir du rab non fini à la fin de la semaine car ils se conservent très longtemps. Mais ils doivent tous être entamés et servir dans au moins un repas.
+  * Les produits frais périssables doivent être cuisinés sur la semaine pour ne pas s'abîmer.
 - CONTRAINTE CONGÉLATEUR : Maximum 3 articles surgelés au total.
 - AUCUN FOUR (poêle, plaques, casserole, micro-ondes uniquement). 2 à 3 étapes simples et rapides (15-20 min max).
 ${params.savedRecipes && params.savedRecipes.length > 0 ? `Recettes favorites des utilisateurs (à réutiliser en priorité) : ${params.savedRecipes.map((r: any) => r.title).join(', ')}` : ''}
@@ -194,7 +197,39 @@ Les catégories autorisées pour la shoppingList sont STRICTEMENT :
       };
     }
 
-    const shoppingList = (parsed.shoppingList || []).map((s: any, idx: number) => {
+    // Build text from all generated recipes to verify usage
+    const allRecipesText = (parsed.recipes || []).map((r: any) => {
+      const ingNames = (r.ingredients || []).map((i: any) => i.name).join(' ');
+      const inst = (r.instructions || []).join(' ');
+      return `${r.title} ${ingNames} ${inst}`.toLowerCase();
+    }).join(' ');
+
+    const stopWords = new Set([
+      'pack', 'boite', 'boîte', 'paquet', 'filet', 'bocal', 'brique', 'sachet', 'barquette',
+      'morceau', 'tranche', 'poids', 'grammes', 'kilo', 'premier', 'prix', 'marque', 'repere',
+      'repère', 'budget', 'pouce', 'auchan', 'leclerc', 'intermarche', 'intermarché',
+      'naturel', 'entier', 'fraiche', 'fraîche', 'frais', 'pure', 'pour', 'avec', 'sans',
+      'format', 'petit', 'grand', 'environ', 'lot', 'conserve'
+    ]);
+
+    // Prune any shopping item that is NOT used in ANY recipe (prevents unopened/orphan products)
+    const rawShoppingItems = (parsed.shoppingList || []).filter((s: any) => {
+      const itemName = (s.name || '').toLowerCase();
+      const words = itemName
+        .replace(/[0-9.,;:!?()/%&'"+\-]/g, ' ')
+        .split(/\s+/)
+        .filter((w: string) => w.length >= 3 && !stopWords.has(w));
+      if (words.length === 0) return true;
+      return words.some((word: string) => {
+        const root = word.replace(/(s|x|es)$/, '');
+        const searchWord = root.length >= 3 ? root : word;
+        return allRecipesText.includes(searchWord);
+      });
+    });
+
+    const activeList = rawShoppingItems.length > 0 ? rawShoppingItems : (parsed.shoppingList || []);
+
+    const shoppingList = activeList.map((s: any, idx: number) => {
       const normName = s.name?.toLowerCase()?.trim() || '';
       let finalPrice = Number(s.estimatedPrice) || 3.0;
       let isUserPrice = false;
