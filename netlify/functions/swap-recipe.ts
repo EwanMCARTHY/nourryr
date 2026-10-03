@@ -12,18 +12,49 @@ const FALLBACK_MODELS = [
   'gemini-flash-lite-latest',
 ];
 
-const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et chef cuisinier expert en musculation et prise de muscle sec pour des sportifs d'environ 84 kg (visant 170g à 195g de protéines par jour).
-Tes règles ABSOLUES :
-1. APPORTS PROTÉINÉS TRÈS ÉLEVÉS : Chaque repas principal doit fournir STRICTEMENT entre 55g et 75g de protéines par portion (poulet, dinde, bœuf haché 5%, thon, colin, œufs, skyr, etc. moyenne ~60-65g).
-2. SATIÉTÉ MAXIMALE & ZÉRO SURPLUS CALORIQUE (VOLUME EATING) :
-   - Calories maîtrisées : STRICTEMENT entre 650 et 800 kcal par portion (aucun repas au-dessus de 800 kcal).
-   - Grand volume alimentaire : part abondante de légumes riches en fibres (200g à 300g par personne : brocolis, courgettes, haricots, épinards...) et féculents à haute satiété (pommes de terre, riz complet, lentilles...).
-   - Graisses de cuisson minimales (1 c. à café d'huile max par portion), liaisons légères (skyr, coulis de tomate sans sucre).
-3. ÉQUIPEMENT DE CUISINE DISPONIBLE : STRICTEMENT plaques de cuisson, poêle, casserole et micro-ondes. AUCUN FOUR (Strictement interdit).
-4. CONTRAINTE CONGÉLATEUR : MAXIMUM 3 ARTICLES SURGELÉS AU TOTAL dans toute la liste de courses (le congélateur est minuscule : max 3 produits surgelés par commande).
-5. BUDGET & ENSEIGNE : Respecte rigoureusement le budget total indiqué pour le supermarché sélectionné (E.Leclerc, Auchan ou Intermarché).
-6. SOBRIÉTÉ : Pas de blabla, pas de description verbeuse, pas de mention Déjeuner/Dîner.
-7. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
+const SYSTEM_INSTRUCTION = `Tu es un préparateur nutritionniste et cuisinier pragmatique, expert en repas économiques, riches en protéines et savoureux pour sportifs (visant 45g à 60g de protéines par portion).
+
+Tes règles FONDAMENTALES :
+
+1. RÉALITÉ DU SUPERMARCHÉ & PACKS ENTIERS (ZÉRO GASPILLAGE) :
+   - Chaque ligne de la liste de courses DOIT être un vrai conditionnement de magasin (jamais de quantité au prorata).
+   - Utilise les vrais prix constatés en France en marques premier prix (Eco+ chez E.Leclerc, Top Budget chez Intermarché, Pouce chez Auchan) :
+     * Boîte de 10-12 œufs : ~2.50€ - 2.80€ (ou plateau de 30 œufs : ~5.50€).
+     * Pack 3 boîtes de thon au naturel (3x140g) : ~3.50€ - 3.80€.
+     * Paquet de 1kg de riz (basmati/blanc) : ~1.30€ - 1.60€.
+     * Paquet de 1kg de pâtes : ~1.10€ - 1.40€.
+     * Filet de 1kg d'oignons : ~1.30€ - 1.50€.
+     * Tête d'ail : ~1.00€.
+     * Boîte de bouillon cube (bœuf/volaille/légumes) : ~1.20€ - 1.40€.
+     * Brique/bocal de coulis ou pulpe de tomate 500g : ~0.90€ - 1.20€.
+     * Bocal de légumes (haricots verts, petits pois) 400g égoutté : ~1.00€ - 1.30€.
+     * Boîte de légumineuses (haricots rouges, pois chiches, lentilles) : ~0.80€ - 1.10€.
+     * Barquette de blanc de volaille 500g : ~4.80€ - 5.50€.
+     * Pack de 4 steaks hachés 15% : ~3.90€ - 4.40€.
+   - ZÉRO RESTE : Les ingrédients achetés doivent être ENTIÈREMENT consommés sur la semaine.
+     * Choisis 2 féculents principaux seulement (RIZ et PÂTES en priorité absolue).
+     * Oignons dans TOUTES les sauces/poêlées pour donner du goût.
+     * Tous les œufs et toutes les boîtes de thon achetés doivent être utilisés dans les recettes. Rien ne doit traîner dans le frigo à la fin de la semaine.
+
+2. PROTÉINES ÉCONOMIQUES : PRIORITÉ MAXIMALE AUX ŒUFS ET AU THON :
+   - Les ŒUFS (omelettes garnies, œufs brouillés, œufs au plat sur riz, riz sauté aux œufs) et le THON au naturel (pâtes au thon sauce tomate, riz sauté thon-oignons, poêlée thon-légumes) sont les protéines PRINCIPALES du menu.
+   - Les viandes fraîches (poulet, steak haché) sont des "bonus" limités à 1 ou 2 repas max dans la semaine pour garder le budget ultra serré.
+   - Apports visés : 45g à 60g de protéines par repas (portion généreuse d'œufs : 3 à 4 œufs par personne, ou 1 boîte entière de thon par personne, ou viande + féculents).
+
+3. PLATS SIMPLES, RAPIDES & ULTRA SAVOUREUX (SANS CRÈME LOURDE) :
+   - Pas de recettes compliquées, 2 à 3 étapes de préparation maximum (15-20 min).
+   - Cuisson directe à la poêle ou casserole. AUCUN FOUR.
+   - Féculents préférés : RIZ et PÂTES. PAS de pommes de terre simplement cuites à l'eau (fade !). Si des pommes de terre sont utilisées, elles doivent impérativement être sautées/dorées à la poêle avec des oignons dorés et des épices.
+   - Assaisonnements obligatoires pour un maximum de goût SANS calories superflues :
+     * Toujours faire revenir des OIGNONS et de l'AIL doré.
+     * Utiliser des CUBES DE BOUILLON émiettés dans la cuisson du riz/pâtes ou dans les poêlées (exhausteur de goût puissant et économique).
+     * Coulis de tomate mijoté, moutarde, filet de sauce soja, épices simples (paprika, curry doux, herbes de Provence, sel, poivre).
+     * Pas de crème fraîche lourde, pas de fromage blanc cuit à la poêle (le fromage blanc ne se cuit pas, il caille).
+
+4. RESPECT STRICT DU BUDGET (PLAFOND INVIOLABLE) :
+   - Le montant total estimé du caddie (somme des prix des packs achetés) DOIT STRICTEMENT être inférieur ou égal au budget défini (estimatedTotalCost <= budget). Jamais de dépassement.
+
+5. FORMAT DE RÉPONSE : Tu DOIS répondre EXCLUSIVEMENT par un objet JSON valide conforme au schéma demandé, sans aucun texte introductif ni markdown.`;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -52,17 +83,17 @@ export const handler: Handler = async (event) => {
 Critères du nouveau plat :
 - Nombre de personnes : ${params.numberOfPeople}
 - Supermarché : ${params.supermarket}
-- Riche en protéines : 55g à 75g de protéines par portion (musculation 84 kg, moyenne ~60-65g).
-- Satiété maximale & zéro surplus calorique : calibrer STRICTEMENT entre 650 et 800 kcal par portion (jamais au-dessus de 800 kcal). Intégrer une belle portion de légumes rassasiants riches en fibres et eau (200g-300g) et féculents à haute satiété (pommes de terre, riz complet, lentilles...), sans excès de matières grasses.
-- CONTRAINTE CONGÉLATEUR : MAXIMUM 3 ARTICLES SURGELÉS AU TOTAL dans toute la liste de courses.
-- AUCUN FOUR (uniquement plaques, poêle, casserole, micro-ondes).
-- Recette différente de "${params.currentRecipe.title}" et différente des autres plats déjà prévus : ${otherTitles.join(', ')}.
+- Simple & Savoureux (15-20 min max, 2-3 étapes) : cuit à la poêle ou casserole, AUCUN FOUR.
+- Protéines : 45g à 60g de protéines par portion. Priorité aux ŒUFS et au THON en boîte (ou viande déjà présente dans la liste).
+- Féculents : RIZ ou PÂTES en priorité absolue. Pas de pommes de terre bouillies à l'eau (fade !). Si pommes de terre, sautées/dorées à la poêle avec oignons et épices.
+- Assaisonnement obligatoire sans crème lourde : Oignons dorés, ail, bouillon cube, coulis de tomate mijoté, épices (paprika, curry, herbes de Provence, poivre). Pas de crème fraîche lourde, pas de fromage blanc cuit à la poêle.
+- Recette différente de "${params.currentRecipe.title}" et des autres plats déjà prévus : ${otherTitles.join(', ')}.
 ${params.excludedIngredients && params.excludedIngredients.length > 0 ? `- ALIMENTS STRICTEMENT INTERDITS (exclus par l'utilisateur) : ${params.excludedIngredients.join(', ')}` : ''}
 
 ADAPTATION DE LA LISTE DE COURSES GRANULAIRE & RESPECT DU BUDGET :
 - Ajuste la liste de courses article par article pour intégrer les ingrédients du nouveau plat et enlever les ingrédients qui ne servaient qu'à l'ancienne recette "${params.currentRecipe.title}".
-- Détaille article par article avec marque distributeur (${params.supermarket}), conditionnement et prix unitaire réaliste.
-- RÈGLE ABSOLUE BUDGET : Utilise si besoin les produits premiers prix (${premierPrixBrand}) et réutilise les ingrédients déjà achetés dans le reste du panier afin que l'estimation totale reste STRICTEMENT <= ${params.budget} €.
+- Réutilise au maximum les ingrédients déjà achetés dans le reste du panier pour limiter les nouveaux achats et éviter le gaspillage.
+- RÈGLE ABSOLUE BUDGET : Utilise si besoin les produits premiers prix (${premierPrixBrand}) afin que l'estimation totale reste STRICTEMENT <= ${params.budget} €.
 ${Object.keys(customPrices).length > 0 ? `PRIX CONNUS DE L'UTILISATEUR : ${JSON.stringify(customPrices)}` : ''}
 
 Réponds avec ce schéma JSON exact :
@@ -71,8 +102,8 @@ Réponds avec ce schéma JSON exact :
     "title": "Nom du plat",
     "prepTimeMinutes": 15,
     "cookTimeMinutes": 15,
-    "proteinGrams": 62,
-    "calories": 720,
+    "proteinGrams": 50,
+    "calories": 650,
     "ingredients": [
       { "name": "Ingrédient", "amount": "Quantité" }
     ],
@@ -80,7 +111,7 @@ Réponds avec ce schéma JSON exact :
       "Étape 1...",
       "Étape 2..."
     ],
-    "equipmentUsed": ["Poêle", "Plaques"]
+    "equipmentUsed": ["Poêle", "Casserole"]
   },
   "updatedShoppingList": [
     {
@@ -89,7 +120,7 @@ Réponds avec ce schéma JSON exact :
       "brand": "Marque",
       "unitDetails": "Format packaging",
       "category": "Boucherie & Poissonnerie",
-      "estimatedPrice": 7.50
+      "estimatedPrice": 3.50
     }
   ],
   "estimatedTotalCost": nombre
@@ -179,7 +210,16 @@ Réponds avec ce schéma JSON exact :
       };
     });
 
-    const totalCost = updatedShoppingList.reduce((sum: number, item: any) => sum + item.estimatedPrice, 0);
+    let totalCost = updatedShoppingList.reduce((sum: number, item: any) => sum + item.estimatedPrice, 0);
+
+    // Hard ceiling: updated budget MUST NOT exceed params.budget
+    if (totalCost > params.budget && totalCost > 0) {
+      const ratio = (params.budget - 0.5) / totalCost;
+      updatedShoppingList.forEach((item: any) => {
+        item.estimatedPrice = Math.max(0.5, Number((item.estimatedPrice * ratio).toFixed(2)));
+      });
+      totalCost = updatedShoppingList.reduce((sum: number, item: any) => sum + item.estimatedPrice, 0);
+    }
 
     const newRecipe = {
       ...parsed.newRecipe,
@@ -194,7 +234,7 @@ Réponds avec ce schéma JSON exact :
       body: JSON.stringify({
         newRecipe,
         updatedShoppingList: updatedShoppingList.length > 0 ? updatedShoppingList : params.currentShoppingList,
-        estimatedTotalCost: Number(totalCost.toFixed(2)) || parsed.estimatedTotalCost || params.budget,
+        estimatedTotalCost: Math.min(Number(totalCost.toFixed(2)) || params.budget, params.budget),
       }),
     };
   } catch (err: any) {
